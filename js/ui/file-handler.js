@@ -299,12 +299,25 @@ class FileHandler {
 
     updateUploadArea(metadata) {
         const fileUploadArea = document.getElementById('fileUploadArea');
+        
+        // Check if fileUploadArea exists
+        if (!fileUploadArea) {
+            console.error('fileUploadArea element not found');
+            return;
+        }
+        
+        // Provide fallback values for metadata
+        const safeMetadata = {
+            title: (metadata && metadata.title) || 'Unknown Title',
+            creator: (metadata && metadata.creator) || 'Unknown Author'
+        };
+        
         fileUploadArea.innerHTML = `
             <div class="current-book">
                 <span class="book-icon">📖</span>
                 <div class="book-details">
-                    <p class="book-title">${this.escapeHTML(metadata.title)}</p>
-                    <p class="book-author">${this.escapeHTML(metadata.creator)}</p>
+                    <p class="book-title">${this.escapeHTML(safeMetadata.title)}</p>
+                    <p class="book-author">${this.escapeHTML(safeMetadata.creator)}</p>
                 </div>
                 <button class="change-book-btn" onclick="this.parentElement.parentElement.click()">Change Book</button>
             </div>
