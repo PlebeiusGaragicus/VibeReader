@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VibeReader - Modern Ebook Reader</title>
+    <link rel="stylesheet" href="css/main.css">
+    <link rel="stylesheet" href="css/themes/default.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-left">
+                <h1 class="app-title">📖 VibeReader</h1>
+            </div>
+            <div class="header-center">
+                <div class="file-upload-area" id="fileUploadArea">
+                    <input type="file" id="fileInput" accept=".epub,.mobi" hidden>
+                    <div class="upload-prompt">
+                        <span class="upload-icon">📁</span>
+                        <p>Drop your EPUB or MOBI file here, or <button id="browseBtn" class="browse-btn">browse</button></p>
+                    </div>
+                </div>
+            </div>
+            <div class="header-right">
+                <button id="settingsBtn" class="icon-btn" title="Settings">⚙️</button>
+            </div>
+        </header>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <!-- Left Panel: Navigation -->
+            <aside class="left-panel" id="leftPanel">
+                <div class="panel-header">
+                    <h3>📑 Table of Contents</h3>
+                    <button id="toggleTocBtn" class="toggle-btn">−</button>
+                </div>
+                <div class="toc-container" id="tocContainer">
+                    <div class="no-book-message">
+                        <p>📚 Upload a book to see the table of contents</p>
+                    </div>
+                </div>
+                <div class="reading-progress">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                    <span class="progress-text" id="progressText">0%</span>
+                </div>
+            </aside>
+
+            <!-- Middle Panel: Reading Area -->
+            <section class="middle-panel" id="middlePanel">
+                <div class="reading-container" id="readingContainer">
+                    <div class="welcome-screen">
+                        <div class="welcome-content">
+                            <h2>Welcome to VibeReader</h2>
+                            <p>Your intelligent ebook reading companion</p>
+                            <div class="feature-highlights">
+                                <div class="feature">
+                                    <span class="feature-icon">📚</span>
+                                    <span>EPUB & MOBI Support</span>
+                                </div>
+                                <div class="feature">
+                                    <span class="feature-icon">🤖</span>
+                                    <span>AI-Powered Q&A</span>
+                                </div>
+                                <div class="feature">
+                                    <span class="feature-icon">✨</span>
+                                    <span>Smart Highlights & Notes</span>
+                                </div>
+                            </div>
+                            <p class="upload-instruction">Upload an ebook to get started!</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Right Panel: Smart Sidebar -->
+            <aside class="right-panel" id="rightPanel">
+                <div class="panel-header">
+                    <h3>🧠 Smart Sidebar</h3>
+                    <button id="toggleSidebarBtn" class="toggle-btn">−</button>
+                </div>
+                
+                <!-- AI Q&A Section -->
+                <div class="sidebar-section">
+                    <h4>🤖 Ask AI</h4>
+                    <div class="qa-container">
+                        <div class="question-input">
+                            <textarea id="questionInput" placeholder="Ask a question about the book..." rows="3"></textarea>
+                            <button id="askBtn" class="ask-btn" disabled>Ask</button>
+                        </div>
+                        <div class="qa-history" id="qaHistory">
+                            <div class="no-content-message">
+                                <p>Upload a book and ask questions to get AI insights!</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Highlights Section -->
+                <div class="sidebar-section">
+                    <h4>🎨 Highlights</h4>
+                    <div class="highlights-container" id="highlightsContainer">
+                        <div class="no-content-message">
+                            <p>Select text and highlight to save important passages</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Notes Section -->
+                <div class="sidebar-section">
+                    <h4>📝 Notes</h4>
+                    <div class="notes-container" id="notesContainer">
+                        <div class="no-content-message">
+                            <p>Add personal notes and thoughts while reading</p>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+        </main>
+
+        <!-- Text Selection Menu -->
+        <div id="textSelectionMenu" class="text-selection-menu hidden">
+            <button id="highlightBtn" class="menu-btn highlight-btn">🎨 Highlight</button>
+            <button id="askAiBtn" class="menu-btn ai-btn">🤖 Ask AI</button>
+            <button id="addNoteBtn" class="menu-btn note-btn">📝 Add Note</button>
+        </div>
+
+        <!-- Modal for Notes -->
+        <div id="noteModal" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>📝 Add Note</h3>
+                    <button id="closeNoteModal" class="close-btn">×</button>
+                </div>
+                <div class="modal-body">
+                    <div class="selected-text" id="selectedTextPreview"></div>
+                    <textarea id="noteTextarea" placeholder="Add your note here..." rows="4"></textarea>
+                </div>
+                <div class="modal-footer">
+                    <button id="cancelNote" class="btn-secondary">Cancel</button>
+                    <button id="saveNote" class="btn-primary">Save Note</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Settings Modal -->
+        <div id="settingsModal" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>⚙️ Settings</h3>
+                    <button id="closeSettingsModal" class="close-btn">×</button>
+                </div>
+                <div class="modal-body">
+                    <div class="setting-group">
+                        <label for="apiEndpoint">AI API Endpoint:</label>
+                        <input type="url" id="apiEndpoint" placeholder="https://api.openai.com/v1/chat/completions">
+                    </div>
+                    <div class="setting-group">
+                        <label for="apiKey">API Key:</label>
+                        <input type="password" id="apiKey" placeholder="Your API key">
+                    </div>
+                    <div class="setting-group">
+                        <label for="aiModel">AI Model:</label>
+                        <select id="aiModel">
+                            <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                            <option value="gpt-4">GPT-4</option>
+                            <option value="gpt-4-turbo">GPT-4 Turbo</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button id="cancelSettings" class="btn-secondary">Cancel</button>
+                    <button id="saveSettings" class="btn-primary">Save Settings</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Loading Overlay -->
+        <div id="loadingOverlay" class="loading-overlay hidden">
+            <div class="loading-content">
+                <div class="spinner"></div>
+                <p id="loadingText">Processing your book...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="js/utils/storage.js"></script>
+    <script src="js/parsers/epub-parser.js"></script>
+    <script src="js/parsers/mobi-parser.js"></script>
+    <script src="js/ui/file-handler.js"></script>
+    <script src="js/ui/text-selection.js"></script>
+    <script src="js/ui/sidebar.js"></script>
+    <script src="js/ai/ai-integration.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
