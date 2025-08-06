@@ -39,8 +39,9 @@ body {
 
 .header-center {
     flex: 1;
-    max-width: 400px;
-    margin: 0 2rem;
+    display: flex;
+    justify-content: center;
+    align-items: center;
 }
 
 .file-upload-area {
@@ -106,7 +107,7 @@ body {
     width: 300px;
     background-color: var(--bg-secondary);
     border-right: 1px solid var(--border-color);
-    display: flex;
+    display: none;  /* Default to collapsed */
     flex-direction: column;
     overflow: hidden;
 }
@@ -119,15 +120,19 @@ body {
     transition: width 0.3s ease;
 }
 
-.right-panel.collapsed {
-    width: 60px;
+.left-panel:not(.collapsed) {
+    display: flex;
 }
 
-.right-panel.collapsed .smart-bar-content {
+.right-panel:not(.collapsed) {
+    display: flex;
+}
+
+.left-panel.collapsed {
     display: none;
 }
 
-.right-panel.collapsed .smart-bar-title {
+.right-panel.collapsed {
     display: none;
 }
 
@@ -419,6 +424,8 @@ body {
 /* Resume Book Section */
 .resume-book-section {
     margin: 1.5rem 0;
+    display: flex;
+    justify-content: center;
 }
 
 .resume-book-btn {
@@ -453,12 +460,67 @@ body {
 
 .last-book-title {
     font-size: 0.9rem;
-    opacity: 0.9;
+    opacity: 0.8;
+    font-weight: 400;
+}
+
+/* Text Size Controls for Reading Content */
+.reading-container.text-size--2 {
+    font-size: 0.8rem;
+}
+
+.reading-container.text-size--1 {
+    font-size: 0.9rem;
+}
+
+.reading-container.text-size-0 {
+    font-size: 1rem; /* Default */
+}
+
+.reading-container.text-size-1 {
+    font-size: 1.1rem;
+}
+
+.reading-container.text-size-2 {
+    font-size: 1.2rem;
+}
+
+/* Note Formatting in Sidebar */
+.note-content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.note-selected-text {
+    color: var(--note-color);
+    font-weight: 500;
     font-style: italic;
-    max-width: 200px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+}
+
+.note-user-text {
+    color: var(--text-primary);
+    font-weight: normal;
+}
+
+/* Studio Credit - Bottom of Screen */
+.studio-credit-bottom {
+    position: fixed;
+    bottom: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    text-align: center;
+    opacity: 0.4;
+    z-index: 10;
+    pointer-events: none;
+}
+
+.studio-credit-bottom p {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    font-style: italic;
+    margin: 0;
+    font-weight: 300;
 }
 
 /* Table of Contents */

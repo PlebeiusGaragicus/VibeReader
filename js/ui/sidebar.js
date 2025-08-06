@@ -5,9 +5,12 @@ class SidebarManager {
         this.app = app;
         this.modalManager = null;
         this.activityItems = [];
-        this.isCollapsed = false;
+        this.isCollapsed = true;  // Default to collapsed
+        this.isTOCCollapsed = true;  // Default to collapsed
+        this.textSizeLevel = 0;  // Default text size (0 = normal, -2 to +2 range)
         this.setupEventListeners();
         this.initializeModalManager();
+        this.loadTextSize();
     }
 
     initializeModalManager() {
@@ -20,6 +23,28 @@ class SidebarManager {
         if (smartBarToggle) {
             smartBarToggle.addEventListener('click', () => {
                 this.toggleSmartBar();
+            });
+        }
+
+        // TOC toggle functionality
+        const tocToggle = document.getElementById('tocToggle');
+        if (tocToggle) {
+            tocToggle.addEventListener('click', () => {
+                this.toggleTOC();
+            });
+        }
+
+        // Text size controls
+        const decreaseTextBtn = document.getElementById('decreaseTextBtn');
+        const increaseTextBtn = document.getElementById('increaseTextBtn');
+        if (decreaseTextBtn) {
+            decreaseTextBtn.addEventListener('click', () => {
+                this.decreaseTextSize();
+            });
+        }
+        if (increaseTextBtn) {
+            increaseTextBtn.addEventListener('click', () => {
+                this.increaseTextSize();
             });
         }
 
@@ -89,8 +114,8 @@ class SidebarManager {
             apiKeyInput.focus();
         });
         
-        // Load saved smart bar state
-        this.loadSmartBarState();
+        // Don't load saved states on initialization - sidebars start hidden
+        // States will be loaded when a book is loaded via expandSidebarsForBook()
     }
 
     toggleSmartBar() {
@@ -113,10 +138,138 @@ class SidebarManager {
         localStorage.setItem('vibeReader_smartBarCollapsed', this.isCollapsed);
     }
 
+    toggleTOC() {
+        const leftPanel = document.getElementById('leftPanel');
+        const tocToggle = document.getElementById('tocToggle');
+        const readingContainer = document.getElementById('readingContainer');
+        
+        // Preserve scroll position more robustly
+        let scrollTop = 0;
+        let scrollElement = null;
+        
+        // Try multiple scroll containers to find the right one
+        if (readingContainer && readingContainer.scrollTop > 0) {
+            scrollElement = readingContainer;
+            scrollTop = readingContainer.scrollTop;
+        } else if (document.documentElement.scrollTop > 0) {
+            scrollElement = document.documentElement;
+            scrollTop = document.documentElement.scrollTop;
+        } else if (document.body.scrollTop > 0) {
+            scrollElement = document.body;
+            scrollTop = document.body.scrollTop;
+        }
+        
+        this.isTOCCollapsed = !this.isTOCCollapsed;
+        
+        if (this.isTOCCollapsed) {
+            leftPanel.classList.add('collapsed');
+            tocToggle.textContent = '📖';
+            tocToggle.title = 'Show Table of Contents';
+        } else {
+            leftPanel.classList.remove('collapsed');
+            tocToggle.textContent = '📑';
+            tocToggle.title = 'Hide Table of Contents';
+        }
+        
+        // Restore scroll position with multiple attempts
+        if (scrollElement && scrollTop > 0) {
+            // Immediate restore
+            scrollElement.scrollTop = scrollTop;
+            
+            // Backup restore after DOM update
+            requestAnimationFrame(() => {
+                scrollElement.scrollTop = scrollTop;
+                
+                // Final backup restore
+                setTimeout(() => {
+                    scrollElement.scrollTop = scrollTop;
+                }, 10);
+            });
+        }
+        
+        // Save state
+        localStorage.setItem('vibeReader_tocCollapsed', this.isTOCCollapsed);
+    }
+
     loadSmartBarState() {
         const saved = localStorage.getItem('vibeReader_smartBarCollapsed');
         if (saved === 'true') {
+            this.isCollapsed = true;
             this.toggleSmartBar();
+        }
+    }
+
+    loadTOCState() {
+        const saved = localStorage.getItem('vibeReader_tocCollapsed');
+        if (saved === 'true') {
+            this.isTOCCollapsed = true;
+            this.toggleTOC();
+        }
+    }
+
+    expandSidebarsForBook() {
+        // When a book is loaded, load saved states or expand both sidebars by default
+        
+        // Load saved TOC state, or expand if no saved state
+        const savedTOC = localStorage.getItem('vibeReader_tocCollapsed');
+        if (savedTOC === 'true') {
+            // User previously collapsed TOC, keep it collapsed
+            this.isTOCCollapsed = true;
+        } else {
+            // Expand TOC (default behavior when book loads)
+            if (this.isTOCCollapsed) {
+                this.toggleTOC();
+            }
+        }
+        
+        // Load saved Smart Bar state, or expand if no saved state
+        const savedSmartBar = localStorage.getItem('vibeReader_smartBarCollapsed');
+        if (savedSmartBar === 'true') {
+            // User previously collapsed Smart Bar, keep it collapsed
+            this.isCollapsed = true;
+        } else {
+            // Expand Smart Bar (default behavior when book loads)
+            if (this.isCollapsed) {
+                this.toggleSmartBar();
+            }
+        }
+    }
+
+    increaseTextSize() {
+        if (this.textSizeLevel < 2) {
+            this.textSizeLevel++;
+            this.applyTextSize();
+            this.saveTextSize();
+        }
+    }
+
+    decreaseTextSize() {
+        if (this.textSizeLevel > -2) {
+            this.textSizeLevel--;
+            this.applyTextSize();
+            this.saveTextSize();
+        }
+    }
+
+    applyTextSize() {
+        const readingContainer = document.getElementById('readingContainer');
+        if (readingContainer) {
+            // Remove existing text size classes
+            readingContainer.classList.remove('text-size--2', 'text-size--1', 'text-size-0', 'text-size-1', 'text-size-2');
+            // Apply current text size class
+            readingContainer.classList.add(`text-size-${this.textSizeLevel}`);
+        }
+    }
+
+    saveTextSize() {
+        localStorage.setItem('vibeReader_textSize', this.textSizeLevel);
+    }
+
+    loadTextSize() {
+        const saved = localStorage.getItem('vibeReader_textSize');
+        if (saved !== null) {
+            this.textSizeLevel = parseInt(saved);
+            this.applyTextSize();
         }
     }
 
@@ -543,17 +696,37 @@ class SidebarManager {
                     ${item.content}
                 </div>
             `;
-        } else {
-            const isLong = item.content.length > 150;
+        } else if (item.type === 'note') {
+            // Format notes like highlights but with green text and user note underneath
+            const selectedText = item.metadata.selectedText || '';
+            const userNote = item.metadata.originalText || '';
+            
+            // Truncate long text for better readability
+            const truncatedSelected = selectedText.length > 100 ? selectedText.substring(0, 100) + '...' : selectedText;
+            const truncatedNote = userNote.length > 100 ? userNote.substring(0, 100) + '...' : userNote;
+            
             contentHTML = `
-                <div class="activity-content ${isLong ? 'preview' : ''}" id="content-${item.id}">
-                    ${this.escapeHTML(isLong ? item.content.substring(0, 150) + '...' : item.content)}
+                <div class="activity-content note-content">
+                    ${selectedText ? `<div class="note-selected-text">${this.escapeHTML(truncatedSelected)}</div>` : ''}
+                    ${userNote ? `<div class="note-user-text">${this.escapeHTML(truncatedNote)}</div>` : ''}
                 </div>
             `;
+        } else {
+            // Regular content for highlights and AI chats - truncate long content
+            const isLong = item.content.length > 150;
+            const displayContent = isLong ? item.content.substring(0, 150) + '...' : item.content;
             
+            contentHTML = `
+                <div class="activity-content">
+                    ${this.escapeHTML(displayContent)}
+                </div>
+            `;
+        }
+        
+        // Only show delete button (no expand button)
+        if (item.type !== 'thinking') {
             actionsHTML = `
                 <div class="activity-actions">
-                    ${isLong ? `<button class="activity-btn" onclick="event.stopPropagation(); window.app.sidebar.expandItem('${item.id}')">Expand</button>` : ''}
                     <button class="activity-btn" onclick="event.stopPropagation(); window.app.sidebar.deleteActivityItem('${item.id}')">Delete</button>
                 </div>
             `;
@@ -572,21 +745,6 @@ class SidebarManager {
                 ${actionsHTML}
             </div>
         `;
-    }
-
-    expandItem(id) {
-        const item = this.activityItems.find(i => i.id === id);
-        if (!item) return;
-        
-        this.modalManager.showModal({
-            id: `expand-${id}`,
-            title: `${item.type.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())} - ${this.formatTime(item.timestamp)}`,
-            content: `<div class="expanded-content">${this.escapeHTML(item.content)}</div>`,
-            buttons: [
-                { text: 'Close', action: 'close', primary: true }
-            ],
-            className: 'expand-modal'
-        });
     }
 
     generateActivityId() {

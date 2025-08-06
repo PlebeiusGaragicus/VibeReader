@@ -13,20 +13,17 @@
         <!-- Header -->
         <header class="app-header">
             <div class="header-left">
-                <h1 class="app-title">📖 VibeReader</h1>
+                <button id="tocToggle" class="icon-btn" title="Toggle Table of Contents">📑</button>
             </div>
             <div class="header-center">
-                <div class="file-upload-area" id="fileUploadArea">
-                    <input type="file" id="fileInput" accept=".epub,.mobi" hidden>
-                    <div class="upload-prompt">
-                        <span class="upload-icon">📁</span>
-                        <p>Drop your EPUB or MOBI file here, or <button id="browseBtn" class="browse-btn">browse</button></p>
-                    </div>
-                </div>
+                <h1 class="app-title">VibeReader</h1>
             </div>
             <div class="header-right">
                 <span id="buildInfo" class="build-info">Build: --</span>
+                <button id="decreaseTextBtn" class="icon-btn" title="Decrease Text Size">➖</button>
+                <button id="increaseTextBtn" class="icon-btn" title="Increase Text Size">➕</button>
                 <button id="themeToggleBtn" class="icon-btn" title="Toggle Theme">🌙</button>
+                <button id="smartBarToggle" class="icon-btn" title="Toggle Smart Bar">📋</button>
                 <button id="settingsBtn" class="icon-btn" title="Settings">⚙️</button>
             </div>
         </header>
@@ -53,6 +50,25 @@
                         <div class="welcome-content">
                             <h2>Welcome to VibeReader</h2>
                             <p>Your intelligent ebook reading companion</p>
+                            
+                            <!-- Resume Last Book -->
+                            <div id="resumeBookSection" class="resume-book-section hidden">
+                                <button id="resumeLastBookBtn" class="resume-book-btn">
+                                    <span class="resume-icon">📖</span>
+                                    <span class="resume-text">Resume Last Book</span>
+                                    <span id="lastBookTitle" class="last-book-title"></span>
+                                </button>
+                            </div>
+                            
+                            <!-- File Upload Area - moved from navbar -->
+                            <div class="file-upload-area" id="fileUploadArea">
+                                <input type="file" id="fileInput" accept=".epub,.mobi" hidden>
+                                <div class="upload-prompt">
+                                    <span class="upload-icon">📁</span>
+                                    <p>Drop your EPUB or MOBI file here, or <button id="browseBtn" class="browse-btn">browse</button></p>
+                                </div>
+                            </div>
+                            
                             <div class="feature-highlights">
                                 <div class="feature">
                                     <span class="feature-icon">📚</span>
@@ -67,27 +83,20 @@
                                     <span>Smart Highlights & Notes</span>
                                 </div>
                             </div>
-                            <div id="resumeBookSection" class="resume-book-section hidden">
-                                <button id="resumeLastBookBtn" class="resume-book-btn">
-                                    <span class="resume-icon">📖</span>
-                                    <span class="resume-text">Resume Last Book</span>
-                                    <span id="lastBookTitle" class="last-book-title"></span>
-                                </button>
-                            </div>
-                            <p class="upload-instruction">Upload an ebook to get started!</p>
                         </div>
                     </div>
                 </div>
             </section>
+            
+            <!-- ABV Studios Credit - Bottom of Screen -->
+            <div class="studio-credit-bottom">
+                <p>ABV Studios - Coded in Oregon with Vibes ✨</p>
+            </div>
 
             <!-- Right Panel: Smart Sidebar -->
             <aside class="right-panel" id="rightPanel">
                 <div class="smart-bar-header">
                     <h3 class="smart-bar-title">📚 Smart Bar</h3>
-                    <div class="smart-bar-controls">
-                        <button id="smartBarToggle" class="icon-btn" title="Toggle Smart Bar">📋</button>
-                        <button id="settingsBtn" class="icon-btn" title="Settings">⚙️</button>
-                    </div>
                 </div>
                 
                 <div class="smart-bar-content" id="smartBarContent">
