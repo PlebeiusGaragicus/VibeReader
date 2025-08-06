@@ -206,6 +206,51 @@ body {
     font-weight: 500;
 }
 
+/* Resume Book Section */
+.resume-book-section {
+    margin: 1.5rem 0;
+}
+
+.resume-book-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1rem 1.5rem;
+    background: linear-gradient(135deg, var(--accent-color), var(--accent-hover));
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 1rem;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    min-width: 280px;
+}
+
+.resume-book-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+}
+
+.resume-icon {
+    font-size: 1.2rem;
+}
+
+.resume-text {
+    font-weight: 600;
+}
+
+.last-book-title {
+    font-size: 0.9rem;
+    opacity: 0.9;
+    font-style: italic;
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 /* Table of Contents */
 .toc-container {
     flex: 1;
@@ -736,6 +781,164 @@ textarea {
 @keyframes spin {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
+}
+
+/* AI Question Bubble */
+.ai-question-bubble {
+    position: fixed;
+    z-index: 1500;
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+    max-width: 350px;
+    min-width: 280px;
+}
+
+.bubble-content {
+    padding: 1rem;
+}
+
+.selected-text-preview {
+    background-color: var(--highlight-bg);
+    padding: 0.5rem;
+    border-radius: 4px;
+    margin-bottom: 0.75rem;
+    font-size: 0.9rem;
+    font-style: italic;
+    border-left: 3px solid var(--accent-color);
+    max-height: 60px;
+    overflow-y: auto;
+}
+
+.question-input-container {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+#bubbleQuestionInput {
+    resize: none;
+    padding: 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 0.9rem;
+}
+
+.bubble-buttons {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: flex-end;
+}
+
+.bubble-btn {
+    padding: 0.4rem 0.8rem;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 500;
+    transition: background-color 0.2s ease;
+}
+
+.bubble-btn.primary {
+    background-color: var(--accent-color);
+    color: white;
+}
+
+.bubble-btn.primary:hover {
+    background-color: var(--accent-hover);
+}
+
+.bubble-btn.secondary {
+    background-color: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+.bubble-btn.secondary:hover {
+    background-color: var(--border-color);
+}
+
+/* Ask Answers Section */
+.ask-answers-container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.ask-answers-list {
+    flex: 1;
+    overflow-y: auto;
+}
+
+.ask-answer-item {
+    margin-bottom: 1rem;
+    padding: 0.75rem;
+    background-color: var(--bg-primary);
+    border-radius: 6px;
+    border-left: 4px solid var(--accent-color);
+}
+
+.ask-answer-question {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 0.5rem;
+    line-height: 1.3;
+}
+
+.ask-answer-selected-text {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    font-style: italic;
+    background-color: var(--highlight-bg);
+    padding: 0.25rem 0.5rem;
+    border-radius: 3px;
+    margin-bottom: 0.5rem;
+    display: block;
+}
+
+.ask-answer-response {
+    font-size: 0.85rem;
+    line-height: 1.4;
+    color: var(--text-primary);
+    margin-bottom: 0.5rem;
+}
+
+.ask-answer-meta {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.ask-answer-timestamp {
+    opacity: 0.7;
+}
+
+.ask-answer-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.ask-answer-action {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 0.75rem;
+    padding: 0.2rem 0.4rem;
+    border-radius: 3px;
+    transition: background-color 0.2s ease;
+}
+
+.ask-answer-action:hover {
+    background-color: var(--bg-hover);
+    color: var(--text-primary);
 }
 
 /* Utility Classes */

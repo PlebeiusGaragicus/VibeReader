@@ -6,6 +6,7 @@
     <title>VibeReader - Modern Ebook Reader</title>
     <link rel="stylesheet" href="css/main.css">
     <link rel="stylesheet" href="css/themes/default.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script>
 </head>
 <body>
     <div id="app">
@@ -65,6 +66,13 @@
                                     <span>Smart Highlights & Notes</span>
                                 </div>
                             </div>
+                            <div id="resumeBookSection" class="resume-book-section hidden">
+                                <button id="resumeLastBookBtn" class="resume-book-btn">
+                                    <span class="resume-icon">📖</span>
+                                    <span class="resume-text">Resume Last Book</span>
+                                    <span id="lastBookTitle" class="last-book-title"></span>
+                                </button>
+                            </div>
                             <p class="upload-instruction">Upload an ebook to get started!</p>
                         </div>
                     </div>
@@ -76,21 +84,17 @@
                 
                 <!-- AI Q&A Section -->
                 <div class="sidebar-section">
-                    <div class="section-header" data-section="askAI">
+                    <div class="section-header">
                         <button class="section-toggle" aria-expanded="true">
                             <span class="toggle-icon">▼</span>
                         </button>
-                        <h4>🤖 Ask AI</h4>
+                        <h4>💬 Ask Answers</h4>
                     </div>
-                    <div class="section-content" id="askAIContent">
-                        <div class="qa-container">
-                            <div class="question-input">
-                                <textarea id="questionInput" placeholder="Ask a question about the book..." rows="3"></textarea>
-                                <button id="askBtn" class="ask-btn" disabled>Ask</button>
-                            </div>
-                            <div class="qa-history" id="qaHistory">
+                    <div class="section-content" id="askAnswersContent">
+                        <div class="ask-answers-container">
+                            <div class="ask-answers-list" id="askAnswersList">
                                 <div class="no-content-message">
-                                    <p>Upload a book and ask questions to get AI insights!</p>
+                                    <p>Select text and ask AI questions to see answers here!</p>
                                 </div>
                             </div>
                         </div>
@@ -140,6 +144,20 @@
             <button id="addNoteBtn" class="menu-btn note-btn">📝 Add Note</button>
         </div>
 
+        <!-- AI Question Bubble -->
+        <div id="aiQuestionBubble" class="ai-question-bubble hidden">
+            <div class="bubble-content">
+                <div class="selected-text-preview" id="bubbleSelectedText"></div>
+                <div class="question-input-container">
+                    <input type="text" id="bubbleQuestionInput" placeholder="Ask about this text..." />
+                    <div class="bubble-buttons">
+                        <button id="bubbleAskBtn" class="bubble-btn primary">Ask AI</button>
+                        <button id="bubbleCancelBtn" class="bubble-btn secondary">Cancel</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Modal for Notes -->
         <div id="noteModal" class="modal hidden">
             <div class="modal-content">
@@ -167,9 +185,9 @@
                 </div>
                 <div class="modal-body">
                     <div class="setting-group">
-                        <label for="apiEndpoint">AI API Endpoint:</label>
+                        <label for="apiEndpoint">AI Base URL:</label>
                         <input type="url" id="apiEndpoint" value="https://webui.plebchat.me/ollama/v1" readonly>
-                        <small class="setting-note">Endpoint is configured for your Ollama instance</small>
+                        <small class="setting-note">OpenAI-compatible base URL (e.g., https://your-server.com/ollama/v1)</small>
                     </div>
                     <div class="setting-group">
                         <label for="apiKey">API Key:</label>
@@ -181,6 +199,7 @@
                         <select id="aiModel">
                             <option value="gemma3:27b-it-q8_0">Gemma (27B)</option>
                             <option value="phi4:14b-q8_0">Phi4 (14B)</option>
+                            <option value="gpt-oss:120b">GPT OSS (120B)</option>
                         </select>
                     </div>
                 </div>

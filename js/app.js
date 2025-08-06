@@ -81,11 +81,50 @@ class VibeReaderApp {
     }
 
     checkForStoredBooks() {
-        const storedBooks = this.storage.getStoredBooks();
+        const lastBookId = this.storage.getLastBook();
         
-        if (storedBooks.length > 0) {
-            // Could implement a "recent books" feature here
-            console.log(`Found ${storedBooks.length} previously loaded books`);
+        if (lastBookId) {
+            const lastBookData = this.storage.getBookData(lastBookId);
+            if (lastBookData) {
+                this.showResumeBookOption(lastBookId, lastBookData);
+            }
+        }
+    }
+
+    showResumeBookOption(bookId, bookData) {
+        const resumeSection = document.getElementById('resumeBookSection');
+        const lastBookTitle = document.getElementById('lastBookTitle');
+        const resumeBtn = document.getElementById('resumeLastBookBtn');
+        
+        if (resumeSection && lastBookTitle && resumeBtn) {
+            // Set the book title
+            lastBookTitle.textContent = bookData.metadata?.title || 'Unknown Book';
+            
+            // Show the resume section
+            resumeSection.classList.remove('hidden');
+            
+            // Add click handler
+            resumeBtn.addEventListener('click', () => {
+                this.resumeLastBook(bookId, bookData);
+            });
+        }
+    }
+
+    async resumeLastBook(bookId, bookData) {
+        try {
+            // Hide the resume section
+            const resumeSection = document.getElementById('resumeBookSection');
+            if (resumeSection) {
+                resumeSection.classList.add('hidden');
+            }
+            
+            // Load the book using the file handler
+            await this.fileHandler.loadBookFromData(bookId, bookData);
+            
+            console.log('Resumed last book:', bookData.metadata?.title);
+        } catch (error) {
+            console.error('Failed to resume last book:', error);
+            this.showError('Failed to resume book: ' + error.message);
         }
     }
 

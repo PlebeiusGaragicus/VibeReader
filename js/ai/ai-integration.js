@@ -90,7 +90,7 @@ Please provide a helpful, accurate, and insightful response based on the book co
 
     async makeAPIRequest(prompt) {
         const requestBody = {
-            model: this.settings.aiModel || 'gpt-3.5-turbo',
+            model: this.settings.aiModel,
             messages: [
                 {
                     role: 'system',
@@ -102,10 +102,18 @@ Please provide a helpful, accurate, and insightful response based on the book co
                 }
             ],
             max_tokens: 500,
-            temperature: 0.7
+            temperature: 0.7,
+            keep_alive: "20m"
         };
 
-        const response = await fetch(this.settings.apiEndpoint, {
+        // Ensure the endpoint uses the correct OpenAI-compatible path
+        let apiEndpoint = this.settings.apiEndpoint;
+        if (!apiEndpoint.endsWith('/chat/completions')) {
+            // If endpoint is just the base URL, append the correct path
+            apiEndpoint = apiEndpoint.replace(/\/+$/, '') + '/chat/completions';
+        }
+
+        const response = await fetch(apiEndpoint, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -143,6 +151,53 @@ Please provide a helpful, accurate, and insightful response based on the book co
     async askAboutSelection(selectedText, bookData) {
         const question = `What does this passage mean and what is its significance in the context of the book: "${selectedText}"`;
         return await this.askQuestion(question, bookData);
+    }
+
+    async askQuestionWithSelectedText(question, selectedText, bookData) {
+        this.loadSettings(); // Refresh settings
+
+        if (!this.settings.apiKey || !this.settings.apiEndpoint) {
+            throw new Error('AI settings not configured. Please set up your API key and endpoint in settings.');
+        }
+
+        try {
+            // Create a focused prompt that prioritizes the selected text
+            const prompt = this.createPromptWithSelectedText(question, selectedText, bookData);
+
+            // Make API request
+            const response = await this.makeAPIRequest(prompt);
+            
+            return response;
+            
+        } catch (error) {
+            console.error('AI API error:', error);
+            throw new Error('Failed to get AI response: ' + error.message);
+        }
+    }
+
+    createPromptWithSelectedText(question, selectedText, bookData) {
+        // Create a prompt that prioritizes the selected text as primary context
+        const bookInfo = `Book: "${bookData.metadata.title}" by ${bookData.metadata.creator}`;
+        
+        const prompt = `You are an AI assistant helping a user understand and analyze a book they are reading.
+
+${bookInfo}
+
+SELECTED PASSAGE (Primary Context):
+"${selectedText}"
+
+USER QUESTION: ${question}
+
+Please provide a helpful, accurate, and insightful response based primarily on the selected passage above. Consider how this passage relates to the broader context of the book "${bookData.metadata.title}" when relevant.`;
+        
+        // DEBUG: Log the actual prompt being sent
+        console.log('=== DEBUG: AI Prompt ===');
+        console.log('Selected Text Param:', selectedText);
+        console.log('Question Param:', question);
+        console.log('Full Prompt:', prompt);
+        console.log('========================');
+        
+        return prompt;
     }
 
     async summarizeChapter(chapterContent, chapterTitle, bookData) {

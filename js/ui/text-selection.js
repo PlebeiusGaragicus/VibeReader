@@ -217,14 +217,189 @@ class TextSelectionHandler {
     askAIAboutSelection() {
         if (!this.selectedText) return;
 
-        // Pre-fill the question input with selected text
-        const questionInput = document.getElementById('questionInput');
-        if (questionInput) {
-            questionInput.value = `What does this mean: "${this.selectedText}"`;
-            questionInput.focus();
+        // CRITICAL FIX: Preserve selected text for the Ask AI bubble
+        // The hideSelectionMenu() call clears this.selectedText, so we need to preserve it
+        this.preservedSelectedText = this.selectedText;
+        
+        // Show the AI question bubble
+        this.showAIQuestionBubble();
+        this.hideSelectionMenu();
+    }
+
+    showAIQuestionBubble() {
+        const bubble = document.getElementById('aiQuestionBubble');
+        const selectedTextPreview = document.getElementById('bubbleSelectedText');
+        const questionInput = document.getElementById('bubbleQuestionInput');
+
+        if (!bubble || !selectedTextPreview || !questionInput) return;
+
+        // Set the selected text preview using preserved text
+        const textToShow = this.preservedSelectedText || this.selectedText || '';
+        selectedTextPreview.textContent = textToShow.length > 100 
+            ? textToShow.substring(0, 100) + '...' 
+            : textToShow;
+
+        // Clear and focus the question input
+        questionInput.value = '';
+        questionInput.placeholder = 'Ask about this text...';
+
+        // Position the bubble near the selection
+        const selection = window.getSelection();
+        if (selection.rangeCount > 0) {
+            const range = selection.getRangeAt(0);
+            const rect = range.getBoundingClientRect();
+            
+            // Position bubble below the selection
+            let top = rect.bottom + 10;
+            let left = rect.left;
+
+            // Adjust if bubble would go off screen
+            const bubbleRect = bubble.getBoundingClientRect();
+            const viewportWidth = window.innerWidth;
+            const viewportHeight = window.innerHeight;
+
+            if (left + 350 > viewportWidth) {
+                left = viewportWidth - 360;
+            }
+            if (left < 10) {
+                left = 10;
+            }
+            if (top + 200 > viewportHeight) {
+                top = rect.top - 210;
+            }
+
+            bubble.style.left = `${left}px`;
+            bubble.style.top = `${top}px`;
         }
 
-        this.hideSelectionMenu();
+        // Show bubble
+        bubble.classList.remove('hidden');
+        
+        // Set up simple button event listeners
+        this.setupBubbleEventListeners();
+        
+        // Simple focus - no cloning, no complex handling
+        setTimeout(() => {
+            if (questionInput) {
+                questionInput.value = ''; // Clear any existing text
+                questionInput.focus();
+            }
+        }, 100);
+    }
+
+    setupBubbleEventListeners() {
+        // ULTRA SIMPLE: Just button clicks, no keyboard shortcuts, no complex focus handling
+        const askBtn = document.getElementById('bubbleAskBtn');
+        const cancelBtn = document.getElementById('bubbleCancelBtn');
+
+        if (!askBtn || !cancelBtn) return;
+
+        // Simple button event listeners - no input event listeners at all
+        askBtn.onclick = () => this.handleBubbleAsk();
+        cancelBtn.onclick = () => this.hideBubble();
+    }
+
+
+
+    async handleBubbleAsk() {
+        const questionInput = document.getElementById('bubbleQuestionInput');
+        const askBtn = document.getElementById('bubbleAskBtn');
+        
+        if (!questionInput || !askBtn) return;
+
+        const question = questionInput.value.trim();
+        if (!question) {
+            questionInput.focus();
+            return;
+        }
+
+        // Disable button and show loading
+        askBtn.disabled = true;
+        askBtn.textContent = 'Asking...';
+
+        try {
+            // Get current book data
+            const currentBook = this.app.fileHandler.getCurrentBook();
+            if (!currentBook) {
+                throw new Error('No book loaded');
+            }
+
+            // Use preserved selected text (fixes the clearing issue)
+            const selectedTextToUse = this.preservedSelectedText || this.selectedText || '';
+            
+            // DEBUG: Log what we're actually sending
+            console.log('=== DEBUG: Ask AI Request ===');
+            console.log('Question:', question);
+            console.log('Current selectedText:', this.selectedText);
+            console.log('Preserved selectedText:', this.preservedSelectedText);
+            console.log('Using selectedText:', selectedTextToUse);
+            console.log('Selected Text Length:', selectedTextToUse ? selectedTextToUse.length : 'null');
+            console.log('Book Title:', currentBook.metadata?.title);
+            console.log('==============================');
+
+            // Verify we have selected text
+            if (!selectedTextToUse || selectedTextToUse.trim() === '') {
+                throw new Error('No text selected. Please select some text first.');
+            }
+
+            // Ask AI about the selected text with proper context
+            // BUG FIX: Use askQuestionWithSelectedText with preserved selected text
+            // The preserved text ensures we don't lose the selection when the menu disappears
+            const response = await this.app.aiIntegration.askQuestionWithSelectedText(
+                question,
+                selectedTextToUse,
+                currentBook
+            );
+
+            // Add to Ask Answers section
+            this.addToAskAnswers({
+                question: question,
+                selectedText: selectedTextToUse,
+                answer: response,
+                timestamp: new Date().toISOString()
+            });
+
+            // Hide bubble
+            this.hideBubble();
+
+        } catch (error) {
+            console.error('AI question error:', error);
+            alert('Failed to get AI response: ' + error.message);
+        } finally {
+            askBtn.disabled = false;
+            askBtn.textContent = 'Ask AI';
+        }
+    }
+
+    hideBubble() {
+        const bubble = document.getElementById('aiQuestionBubble');
+        if (bubble) {
+            bubble.classList.add('hidden');
+        }
+        // Clear selection and preserved text
+        this.clearSelection();
+        this.preservedSelectedText = null;
+    }
+
+    addToAskAnswers(answerData) {
+        // Save to storage
+        const bookId = this.app.fileHandler.getCurrentBook()?.id;
+        if (bookId) {
+            const askAnswers = this.app.storage.getAskAnswers(bookId) || [];
+            const answerItem = {
+                id: this.generateAnswerId(),
+                ...answerData
+            };
+            askAnswers.unshift(answerItem); // Add to beginning
+            this.app.storage.saveAskAnswers(bookId, askAnswers);
+            
+            // Update sidebar display
+            this.app.sidebar.displayAskAnswers(askAnswers);
+        }
+    }
+
+    generateAnswerId() {
+        return 'answer_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
     }
 
     addNoteForSelection() {

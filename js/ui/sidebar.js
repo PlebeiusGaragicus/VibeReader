@@ -24,36 +24,7 @@ class SidebarManager {
             });
         });
 
-        // Ask AI button
-        document.getElementById('askBtn').addEventListener('click', () => {
-            this.handleAIQuestion();
-        });
-
-        // Question input enter key and comprehensive focus handling
-        const questionInput = document.getElementById('questionInput');
-        
-        // Prevent all event bubbling for the input
-        ['mousedown', 'mouseup', 'click', 'focus', 'blur', 'keydown', 'keyup', 'keypress'].forEach(eventType => {
-            questionInput.addEventListener(eventType, (e) => {
-                e.stopPropagation();
-                e.stopImmediatePropagation();
-            });
-        });
-        
-        // Handle Enter key separately
-        questionInput.addEventListener('keypress', (e) => {
-            e.stopPropagation();
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                this.handleAIQuestion();
-            }
-        });
-        
-        // Ensure input stays focusable
-        questionInput.addEventListener('mousedown', (e) => {
-            e.preventDefault();
-            questionInput.focus();
-        });
+        // Note: Old Ask AI button and question input removed - now handled by bubble interface
 
         // Note modal events
         document.getElementById('saveNote').addEventListener('click', () => {
@@ -177,74 +148,12 @@ class SidebarManager {
         });
     }
 
-    async handleAIQuestion() {
-        const questionInput = document.getElementById('questionInput');
-        const askBtn = document.getElementById('askBtn');
-        const question = questionInput.value.trim();
-
-        if (!question) return;
-
-        const currentBook = this.app.fileHandler.getCurrentBook();
-        if (!currentBook) {
-            this.showError('Please upload a book first');
-            return;
-        }
-
-        try {
-            askBtn.disabled = true;
-            askBtn.textContent = 'Asking...';
-
-            // Get AI response
-            const response = await this.app.aiIntegration.askQuestion(question, currentBook);
-
-            // Add to Q&A history
-            const qaItem = {
-                id: this.generateQAId(),
-                question: question,
-                answer: response,
-                timestamp: new Date().toISOString()
-            };
-
-            // Save to storage
-            const qaHistory = this.app.storage.getQAHistory(currentBook.id);
-            qaHistory.unshift(qaItem); // Add to beginning
-            this.app.storage.saveQAHistory(currentBook.id, qaHistory);
-
-            // Update display
-            this.displayQAHistory(qaHistory);
-
-            // Clear input
-            questionInput.value = '';
-
-        } catch (error) {
-            console.error('AI question error:', error);
-            this.showError('Failed to get AI response: ' + error.message);
-        } finally {
-            askBtn.disabled = false;
-            askBtn.textContent = 'Ask';
-        }
-    }
+    // Note: handleAIQuestion method removed - AI questions now handled via bubble interface in text-selection.js
 
     displayQAHistory(qaHistory) {
-        const qaHistoryContainer = document.getElementById('qaHistory');
-        
-        if (!qaHistory || qaHistory.length === 0) {
-            qaHistoryContainer.innerHTML = '<div class="no-content-message"><p>Ask questions to get AI insights!</p></div>';
-            return;
-        }
-
-        const qaHTML = qaHistory.map(qa => `
-            <div class="qa-item" data-qa-id="${qa.id}">
-                <div class="qa-question">${this.escapeHTML(qa.question)}</div>
-                <div class="qa-answer">${this.formatAIResponse(qa.answer)}</div>
-                <div class="item-meta">
-                    <span>${new Date(qa.timestamp).toLocaleDateString()}</span>
-                    <button class="delete-btn" onclick="app.sidebar.deleteQA('${qa.id}')">🗑️</button>
-                </div>
-            </div>
-        `).join('');
-
-        qaHistoryContainer.innerHTML = qaHTML;
+        // Note: QA History display removed - functionality replaced by Ask Answers section
+        // This method is kept for compatibility but does nothing since the DOM element no longer exists
+        console.log('QA History display called but element removed - functionality replaced by Ask Answers');
     }
 
     displayHighlights(highlights) {
@@ -288,6 +197,73 @@ class SidebarManager {
         `).join('');
 
         notesContainer.innerHTML = notesHTML;
+    }
+
+    displayAskAnswers(askAnswers) {
+        const askAnswersContainer = document.getElementById('askAnswersList');
+        
+        if (!askAnswers || askAnswers.length === 0) {
+            askAnswersContainer.innerHTML = `
+                <div class="no-content-message">
+                    <p>Select text and ask AI questions to see answers here!</p>
+                </div>
+            `;
+            return;
+        }
+
+        const answersHTML = askAnswers.map(answer => {
+            const truncatedResponse = answer.answer.length > 200 
+                ? answer.answer.substring(0, 200) + '...' 
+                : answer.answer;
+            
+            const truncatedSelectedText = answer.selectedText.length > 80 
+                ? answer.selectedText.substring(0, 80) + '...' 
+                : answer.selectedText;
+
+            return `
+                <div class="ask-answer-item" data-answer-id="${answer.id}">
+                    <div class="ask-answer-question">${this.escapeHTML(answer.question)}</div>
+                    <div class="ask-answer-selected-text">"${this.escapeHTML(truncatedSelectedText)}"</div>
+                    <div class="ask-answer-response">${this.escapeHTML(truncatedResponse)}</div>
+                    <div class="ask-answer-meta">
+                        <span class="ask-answer-timestamp">${new Date(answer.timestamp).toLocaleDateString()}</span>
+                        <div class="ask-answer-actions">
+                            <button class="ask-answer-action" onclick="app.sidebar.expandAnswer('${answer.id}')" title="View full answer">📖 Expand</button>
+                            <button class="ask-answer-action" onclick="app.sidebar.deleteAskAnswer('${answer.id}')" title="Delete answer">🗑️ Delete</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        askAnswersContainer.innerHTML = answersHTML;
+    }
+
+    expandAnswer(answerId) {
+        const currentBook = this.app.fileHandler.getCurrentBook();
+        if (!currentBook) return;
+
+        const askAnswers = this.app.storage.getAskAnswers(currentBook.id);
+        const answer = askAnswers.find(a => a.id === answerId);
+        
+        if (answer) {
+            // Show full answer in a simple alert for now - could be enhanced with a modal
+            const fullText = `Question: ${answer.question}\n\nSelected Text: "${answer.selectedText}"\n\nAnswer: ${answer.answer}`;
+            alert(fullText);
+        }
+    }
+
+    deleteAskAnswer(answerId) {
+        if (!confirm('Delete this AI answer?')) return;
+
+        const currentBook = this.app.fileHandler.getCurrentBook();
+        if (!currentBook) return;
+
+        const askAnswers = this.app.storage.getAskAnswers(currentBook.id);
+        const updatedAnswers = askAnswers.filter(a => a.id !== answerId);
+        
+        this.app.storage.saveAskAnswers(currentBook.id, updatedAnswers);
+        this.displayAskAnswers(updatedAnswers);
     }
 
     saveNote() {

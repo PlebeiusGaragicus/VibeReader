@@ -76,12 +76,18 @@ class FileHandler {
             // Generate book ID
             const bookId = this.generateBookId(file.name, bookData.metadata);
             
+            // Clear other books but preserve user data (notes, highlights, ask answers)
+            this.app.storage.clearOtherBooks(bookId);
+            
             // Store book data
             this.app.storage.saveBookData(bookId, {
                 filename: file.name,
                 uploadDate: new Date().toISOString(),
                 ...bookData
             });
+            
+            // Save as last book
+            this.app.storage.saveLastBook(bookId);
 
             // Load the book
             await this.loadBook(bookId, bookData);
@@ -112,6 +118,29 @@ class FileHandler {
 
         // Update upload area
         this.updateUploadArea(bookData.metadata);
+    }
+
+    async loadBookFromData(bookId, bookData) {
+        try {
+            // Show loading overlay
+            this.showLoading('Loading your book...');
+            
+            // Save as last book
+            this.app.storage.saveLastBook(bookId);
+            
+            // Load the book
+            await this.loadBook(bookId, bookData);
+            
+            this.hideLoading();
+            
+            console.log('Book loaded from storage:', bookData.metadata?.title);
+            
+        } catch (error) {
+            this.hideLoading();
+            this.showError('Failed to load book: ' + error.message);
+            console.error('Book loading error:', error);
+            throw error;
+        }
     }
 
     updateHeader(metadata) {
@@ -200,6 +229,10 @@ class FileHandler {
         // Load Q&A history
         const qaHistory = this.app.storage.getQAHistory(bookId);
         this.app.sidebar.displayQAHistory(qaHistory);
+
+        // Load Ask Answers
+        const askAnswers = this.app.storage.getAskAnswers(bookId);
+        this.app.sidebar.displayAskAnswers(askAnswers);
 
         // Apply highlights to content
         this.applyHighlights(highlights);

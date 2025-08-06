@@ -111,9 +111,9 @@ To enable AI features, configure your API settings:
 ```javascript
 // In js/config.js
 const AI_CONFIG = {
-  apiEndpoint: 'https://api.openai.com/v1/chat/completions',
+  apiEndpoint: 'https://webui.plebchat.me/ollama/v1', // Base URL - /chat/completions is appended automatically
   apiKey: 'your-api-key-here', // Store securely!
-  model: 'gpt-3.5-turbo'
+  model: 'gemma3:27b-it-q8_0'
 };
 ```
 
