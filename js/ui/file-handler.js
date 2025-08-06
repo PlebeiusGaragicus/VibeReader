@@ -118,6 +118,11 @@ class FileHandler {
 
         // Update upload area
         this.updateUploadArea(bookData.metadata);
+
+        // Restore scroll position if scroll manager is available
+        if (this.app.scrollManager) {
+            this.app.scrollManager.restoreScrollPosition(bookId);
+        }
     }
 
     async loadBookFromData(bookId, bookData) {

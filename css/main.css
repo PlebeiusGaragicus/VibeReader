@@ -162,6 +162,49 @@ body {
     font-size: 1.1rem;
 }
 
+/* Enhanced paragraph and text spacing for better readability */
+.reading-container p {
+    margin-bottom: 2rem;
+    line-height: 1.8;
+}
+
+.reading-container p:last-child {
+    margin-bottom: 0;
+}
+
+/* Add spacing for other text elements */
+.reading-container div,
+.reading-container section,
+.reading-container article {
+    margin-bottom: 1.5rem;
+}
+
+/* Ensure line breaks create visible gaps */
+.reading-container br {
+    line-height: 2.5;
+}
+
+/* Add spacing after headings */
+.reading-container h1,
+.reading-container h2,
+.reading-container h3,
+.reading-container h4,
+.reading-container h5,
+.reading-container h6 {
+    margin-bottom: 1.5rem;
+    margin-top: 2rem;
+    line-height: 1.4;
+}
+
+.reading-container h1:first-child,
+.reading-container h2:first-child,
+.reading-container h3:first-child,
+.reading-container h4:first-child,
+.reading-container h5:first-child,
+.reading-container h6:first-child {
+    margin-top: 0;
+}
+
 .welcome-screen {
     display: flex;
     align-items: center;

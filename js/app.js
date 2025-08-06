@@ -7,6 +7,8 @@ class VibeReaderApp {
         this.textSelection = null;
         this.sidebar = null;
         this.aiIntegration = null;
+        this.themeManager = null;
+        this.scrollManager = null;
         
         this.init();
     }
@@ -15,6 +17,10 @@ class VibeReaderApp {
         try {
             // Initialize storage
             this.storage = new StorageManager();
+            
+            // Initialize theme and scroll managers
+            this.themeManager = new ThemeManager();
+            this.scrollManager = new ScrollManager();
             
             // Initialize AI integration
             this.aiIntegration = new AIIntegration(this);
