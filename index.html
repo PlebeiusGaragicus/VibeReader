@@ -3,11 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="build" content="2">
     <title>VibeReader - Modern Ebook Reader</title>
-    <!-- BUILD: 2 | 2025-08-05 17:05:10 -->
-    <link rel="stylesheet" href="css/main.css?v=2">
-    <link rel="stylesheet" href="css/themes/default.css?v=2">
+    <link rel="stylesheet" href="css/main.css">
+    <link rel="stylesheet" href="css/themes/default.css">
 </head>
 <body>
     <div id="app">
@@ -26,6 +24,7 @@
                 </div>
             </div>
             <div class="header-right">
+                <span id="buildInfo" class="build-info">Build: --</span>
                 <button id="settingsBtn" class="icon-btn" title="Settings">⚙️</button>
             </div>
         </header>
@@ -35,8 +34,7 @@
             <!-- Left Panel: Navigation -->
             <aside class="left-panel" id="leftPanel">
                 <div class="panel-header">
-                    <h3>📑 Table of Contents</h3>
-                    <button id="toggleTocBtn" class="toggle-btn">−</button>
+                    <h3 style="text-align: center;">Table of Contents</h3>
                 </div>
                 <div class="toc-container" id="tocContainer">
                     <div class="no-book-message">
@@ -75,10 +73,6 @@
 
             <!-- Right Panel: Smart Sidebar -->
             <aside class="right-panel" id="rightPanel">
-                <div class="panel-header">
-                    <h3>🧠 Smart Sidebar</h3>
-                    <button id="toggleSidebarBtn" class="toggle-btn">−</button>
-                </div>
                 
                 <!-- AI Q&A Section -->
                 <div class="sidebar-section">
@@ -185,13 +179,14 @@
     </div>
 
     <!-- Scripts -->
-    <script src="js/utils/storage.js?v=2"></script>
-    <script src="js/parsers/epub-parser.js?v=2"></script>
-    <script src="js/parsers/mobi-parser.js?v=2"></script>
-    <script src="js/ui/file-handler.js?v=2"></script>
-    <script src="js/ui/text-selection.js?v=2"></script>
-    <script src="js/ui/sidebar.js?v=2"></script>
-    <script src="js/ai/ai-integration.js?v=2"></script>
-    <script src="js/app.js?v=2"></script>
+    <script src="js/utils/build-info.js"></script>
+    <script src="js/utils/storage.js"></script>
+    <script src="js/parsers/epub-parser.js"></script>
+    <script src="js/parsers/mobi-parser.js"></script>
+    <script src="js/ui/file-handler.js"></script>
+    <script src="js/ui/text-selection.js"></script>
+    <script src="js/ui/sidebar.js"></script>
+    <script src="js/ai/ai-integration.js"></script>
+    <script src="js/app.js"></script>
 </body>
 </html>

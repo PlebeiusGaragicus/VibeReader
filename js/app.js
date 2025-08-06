@@ -30,7 +30,10 @@ class VibeReaderApp {
             // Check for previously loaded books
             this.checkForStoredBooks();
             
-            console.log('VibeReader initialized successfully');
+            // Add build info to meta tag for cache busting
+            this.addBuildInfoToPage();
+            
+            console.log(`VibeReader initialized successfully (Build ${BuildInfo.build})`);
             
         } catch (error) {
             console.error('Failed to initialize VibeReader:', error);
@@ -321,6 +324,90 @@ class VibeReaderApp {
         } catch (error) {
             console.error('Failed to import user data:', error);
             return false;
+        }
+    }
+    
+    addBuildInfoToPage() {
+        // Add build info to meta tag for cache busting
+        if (window.BuildInfo) {
+            // Add or update meta tag
+            let metaTag = document.querySelector('meta[name="build"]');
+            if (!metaTag) {
+                metaTag = document.createElement('meta');
+                metaTag.setAttribute('name', 'build');
+                document.head.appendChild(metaTag);
+            }
+            metaTag.setAttribute('content', BuildInfo.build);
+            
+            // Add build info comment after title
+            const titleTag = document.querySelector('title');
+            if (titleTag && titleTag.nextSibling?.nodeType !== Node.COMMENT_NODE) {
+                const buildComment = document.createComment(` BUILD: ${BuildInfo.build} `);
+                titleTag.parentNode.insertBefore(buildComment, titleTag.nextSibling);
+            }
+            
+            // Update build info in UI
+            const buildInfoElement = document.getElementById('buildInfo');
+            if (buildInfoElement) {
+                buildInfoElement.textContent = `Build: ${BuildInfo.build}`;
+            }
+            
+            // Add cache busting to all CSS and JS files
+            this.addCacheBustingToResources();
+            
+            // Add basic styling for build info
+            this.addBuildInfoStyles();
+            
+            console.log(`Build info added: Build ${BuildInfo.build}`);
+        }
+    }
+    
+    addCacheBustingToResources() {
+        // Add cache busting query parameter to CSS and JS files
+        if (!window.BuildInfo) return;
+        
+        const cssLinks = document.querySelectorAll('link[rel="stylesheet"]');
+        const scripts = document.querySelectorAll('script[src]');
+        
+        // Update CSS links
+        cssLinks.forEach(link => {
+            const currentHref = link.getAttribute('href');
+            if (currentHref && !currentHref.includes('?v=')) {
+                link.setAttribute('href', `${currentHref}?v=${BuildInfo.build}`);
+            }
+        });
+        
+        // Update JS scripts
+        scripts.forEach(script => {
+            const currentSrc = script.getAttribute('src');
+            if (currentSrc && !currentSrc.includes('?v=') && !currentSrc.includes('build-info.js')) {
+                script.setAttribute('src', `${currentSrc}?v=${BuildInfo.build}`);
+            }
+        });
+    }
+    
+    addBuildInfoStyles() {
+        // Add styles for build info display if not already present
+        if (!document.querySelector('#build-info-styles')) {
+            const styles = document.createElement('style');
+            styles.id = 'build-info-styles';
+            styles.textContent = `
+                .build-info {
+                    font-size: 0.75rem;
+                    color: #666;
+                    background: rgba(0,0,0,0.05);
+                    padding: 0.25rem 0.5rem;
+                    border-radius: 4px;
+                    margin-right: 0.5rem;
+                    font-family: monospace;
+                    border: 1px solid rgba(0,0,0,0.1);
+                }
+                .build-info:hover {
+                    background: rgba(0,0,0,0.1);
+                    color: #333;
+                }
+            `;
+            document.head.appendChild(styles);
         }
     }
 }

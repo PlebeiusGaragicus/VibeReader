@@ -169,10 +169,23 @@ class FileHandler {
         `).join('');
 
         readingContainer.innerHTML = contentHTML;
-
-
-
-
+        
+        // Handle image loading errors to prevent 404 console spam
+        this.handleImageErrors(readingContainer);
+    }
+    
+    handleImageErrors(container) {
+        const images = container.querySelectorAll('img');
+        images.forEach(img => {
+            img.addEventListener('error', (e) => {
+                // Replace broken images with a placeholder or hide them
+                e.target.style.display = 'none';
+                console.warn(`Image not found: ${e.target.src}`);
+            });
+            
+            // Add loading attribute for better performance
+            img.setAttribute('loading', 'lazy');
+        });
     }
 
     loadUserData(bookId) {
@@ -241,9 +254,9 @@ class FileHandler {
     updateUploadArea(metadata) {
         const fileUploadArea = document.getElementById('fileUploadArea');
         
-        // Check if fileUploadArea exists
+        // Check if fileUploadArea exists - silently return if not found
         if (!fileUploadArea) {
-            console.error('fileUploadArea element not found');
+            // Element may not exist in current UI state, which is normal
             return;
         }
         

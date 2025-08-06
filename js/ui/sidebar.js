@@ -7,15 +7,6 @@ class SidebarManager {
     }
 
     setupEventListeners() {
-        // Toggle buttons
-        document.getElementById('toggleTocBtn').addEventListener('click', () => {
-            this.togglePanel('left');
-        });
-
-        document.getElementById('toggleSidebarBtn').addEventListener('click', () => {
-            this.togglePanel('right');
-        });
-
         // Ask AI button
         document.getElementById('askBtn').addEventListener('click', () => {
             this.handleAIQuestion();
@@ -60,18 +51,7 @@ class SidebarManager {
         });
     }
 
-    togglePanel(side) {
-        const panel = document.querySelector(`.${side}-panel`);
-        const toggleBtn = document.getElementById(side === 'left' ? 'toggleTocBtn' : 'toggleSidebarBtn');
-        
-        if (panel.style.display === 'none') {
-            panel.style.display = 'flex';
-            toggleBtn.textContent = '−';
-        } else {
-            panel.style.display = 'none';
-            toggleBtn.textContent = '+';
-        }
-    }
+    // togglePanel method removed - collapse functionality no longer needed
 
     async handleAIQuestion() {
         const questionInput = document.getElementById('questionInput');

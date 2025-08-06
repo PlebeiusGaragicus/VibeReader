@@ -235,7 +235,7 @@ class EPUBParser {
                 const doc = parser.parseFromString(html, 'text/html');
                 
                 // Clean up the HTML content
-                this.cleanupHTML(doc);
+                await this.cleanupHTML(doc);
                 
                 content.push({
                     id: spineItem.id,
@@ -251,7 +251,7 @@ class EPUBParser {
         return content;
     }
 
-    cleanupHTML(doc) {
+    async cleanupHTML(doc) {
         // Remove script tags
         const scripts = doc.querySelectorAll('script');
         scripts.forEach(script => script.remove());
@@ -266,22 +266,84 @@ class EPUBParser {
         
         // Convert relative image paths to data URLs if possible
         const images = doc.querySelectorAll('img');
-        images.forEach(async (img) => {
+        console.log(`Found ${images.length} images to process`);
+        
+        const imagePromises = Array.from(images).map(async (img, index) => {
             const src = img.getAttribute('src');
+            console.log(`Processing image ${index + 1}: original src = "${src}"`);
+            
             if (src && !src.startsWith('http') && !src.startsWith('data:')) {
                 const imagePath = this.resolveHref(src);
+                console.log(`Resolved image path: "${imagePath}"`);
+                
+                // List all files in the EPUB to help debug
+                const allFiles = Object.keys(this.zip.files);
+                const imageFiles = allFiles.filter(f => f.match(/\.(jpg|jpeg|png|gif|svg|webp)$/i));
+                console.log(`Available image files in EPUB:`, imageFiles);
+                
                 const imageFile = this.zip.file(imagePath);
                 if (imageFile) {
                     try {
+                        console.log(`Found image file, extracting: ${imagePath}`);
                         const imageData = await imageFile.async('base64');
                         const mimeType = this.getMimeType(imagePath);
-                        img.src = `data:${mimeType};base64,${imageData}`;
+                        const dataUrl = `data:${mimeType};base64,${imageData}`;
+                        img.src = dataUrl;
+                        
+                        // Add responsive styling and click handler
+                        this.setupImageDisplay(img);
+                        
+                        console.log(`✅ Successfully converted image: ${imagePath} (${imageData.length} bytes)`);
                     } catch (error) {
-                        console.warn(`Failed to load image ${imagePath}:`, error);
+                        console.error(`❌ Failed to load image ${imagePath}:`, error);
+                        img.style.display = 'none';
+                    }
+                } else {
+                    console.warn(`❌ Image file not found in EPUB: "${imagePath}"`);
+                    console.log(`Trying alternative paths...`);
+                    
+                    // Try some alternative path resolutions
+                    const alternatives = [
+                        src, // Original path
+                        src.replace(/^\.\//, ''), // Remove leading ./
+                        src.replace(/^\//, ''), // Remove leading /
+                        'images/' + src.split('/').pop(), // Try images/ directory
+                        'OEBPS/' + src, // Try OEBPS prefix
+                        'OEBPS/images/' + src.split('/').pop() // Try OEBPS/images/
+                    ];
+                    
+                    let found = false;
+                    for (const altPath of alternatives) {
+                        const altFile = this.zip.file(altPath);
+                        if (altFile) {
+                            console.log(`✅ Found image at alternative path: ${altPath}`);
+                            try {
+                                const imageData = await altFile.async('base64');
+                                const mimeType = this.getMimeType(altPath);
+                                img.src = `data:${mimeType};base64,${imageData}`;
+                                
+                                // Add responsive styling and click handler
+                                this.setupImageDisplay(img);
+                                
+                                found = true;
+                                break;
+                            } catch (error) {
+                                console.warn(`Failed to load alternative path ${altPath}:`, error);
+                            }
+                        }
+                    }
+                    
+                    if (!found) {
+                        img.style.display = 'none';
                     }
                 }
+            } else {
+                console.log(`Skipping image ${index + 1}: external or data URL`);
             }
         });
+        
+        // Wait for all image processing to complete
+        await Promise.all(imagePromises);
     }
 
     extractTitle(doc) {
@@ -331,6 +393,123 @@ class EPUBParser {
             parent = parent.parentElement;
         }
         return level;
+    }
+
+    setupImageDisplay(img) {
+        // Add responsive styling
+        img.style.maxWidth = '100%';
+        img.style.height = 'auto';
+        img.style.display = 'block';
+        img.style.margin = '1rem auto';
+        img.style.cursor = 'pointer';
+        img.style.borderRadius = '4px';
+        img.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)';
+        img.style.transition = 'transform 0.2s ease';
+        
+        // Add hover effect
+        img.addEventListener('mouseenter', () => {
+            img.style.transform = 'scale(1.02)';
+        });
+        
+        img.addEventListener('mouseleave', () => {
+            img.style.transform = 'scale(1)';
+        });
+        
+        // Add click handler for fullscreen
+        img.addEventListener('click', (e) => {
+            e.preventDefault();
+            this.openImageFullscreen(img);
+        });
+    }
+    
+    openImageFullscreen(img) {
+        // Create fullscreen overlay
+        const overlay = document.createElement('div');
+        overlay.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0, 0, 0, 0.9);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+            cursor: pointer;
+        `;
+        
+        // Create fullscreen image
+        const fullscreenImg = document.createElement('img');
+        fullscreenImg.src = img.src;
+        fullscreenImg.style.cssText = `
+            max-width: 95vw;
+            max-height: 95vh;
+            object-fit: contain;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        `;
+        
+        // Create close button
+        const closeBtn = document.createElement('button');
+        closeBtn.innerHTML = '×';
+        closeBtn.style.cssText = `
+            position: absolute;
+            top: 20px;
+            right: 30px;
+            background: rgba(255,255,255,0.2);
+            border: none;
+            color: white;
+            font-size: 2rem;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s ease;
+        `;
+        
+        closeBtn.addEventListener('mouseenter', () => {
+            closeBtn.style.background = 'rgba(255,255,255,0.3)';
+        });
+        
+        closeBtn.addEventListener('mouseleave', () => {
+            closeBtn.style.background = 'rgba(255,255,255,0.2)';
+        });
+        
+        // Add elements to overlay
+        overlay.appendChild(fullscreenImg);
+        overlay.appendChild(closeBtn);
+        
+        // Close handlers
+        const closeFullscreen = () => {
+            document.body.removeChild(overlay);
+            document.body.style.overflow = '';
+        };
+        
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) {
+                closeFullscreen();
+            }
+        });
+        
+        closeBtn.addEventListener('click', closeFullscreen);
+        
+        // Escape key handler
+        const escapeHandler = (e) => {
+            if (e.key === 'Escape') {
+                closeFullscreen();
+                document.removeEventListener('keydown', escapeHandler);
+            }
+        };
+        
+        document.addEventListener('keydown', escapeHandler);
+        
+        // Add to DOM
+        document.body.style.overflow = 'hidden';
+        document.body.appendChild(overlay);
     }
 
     getMimeType(filename) {
