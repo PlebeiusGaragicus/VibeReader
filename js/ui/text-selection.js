@@ -370,6 +370,12 @@ class TextSelectionHandler {
                 throw new Error('No text selected. Please select some text first.');
             }
 
+            // Immediately add thinking placeholder to smart bar
+            const thinkingId = this.app.sidebar.addThinkingAIChat(question, selectedTextToUse);
+            
+            // Hide bubble immediately
+            this.hideBubble();
+
             // Ask AI about the selected text with proper context
             // BUG FIX: Use askQuestionWithSelectedText with preserved selected text
             // The preserved text ensures we don't lose the selection when the menu disappears
@@ -379,16 +385,16 @@ class TextSelectionHandler {
                 currentBook
             );
 
-            // Add to Ask Answers section
+            // Update the thinking placeholder with the actual response
+            this.app.sidebar.updateAIChat(thinkingId, response);
+
+            // Also add to traditional Ask Answers for backward compatibility
             this.addToAskAnswers({
                 question: question,
                 selectedText: selectedTextToUse,
                 answer: response,
                 timestamp: new Date().toISOString()
             });
-
-            // Hide bubble
-            this.hideBubble();
 
         } catch (error) {
             console.error('AI question error:', error);
@@ -432,6 +438,10 @@ class TextSelectionHandler {
 
     addNoteForSelection() {
         if (!this.selectedText) return;
+
+        // Preserve the selected range for note creation
+        this.app.sidebar.preservedSelectedRange = this.selectedRange ? this.selectedRange.cloneRange() : null;
+        this.app.sidebar.preservedSelectedText = this.selectedText;
 
         // Show note modal with selected text
         const noteModal = document.getElementById('noteModal');

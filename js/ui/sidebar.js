@@ -1,28 +1,27 @@
-// Sidebar Manager for VibeReader
+// Smart Bar Manager for VibeReader
 
 class SidebarManager {
     constructor(app) {
         this.app = app;
+        this.modalManager = null;
+        this.activityItems = [];
+        this.isCollapsed = false;
         this.setupEventListeners();
+        this.initializeModalManager();
+    }
+
+    initializeModalManager() {
+        this.modalManager = new ModalManager();
     }
 
     setupEventListeners() {
-        // Collapsible section toggles - only on toggle button and header text
-        document.querySelectorAll('.section-toggle').forEach(toggle => {
-            toggle.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const header = toggle.closest('.section-header');
-                this.toggleSection(header.dataset.section);
+        // Smart bar toggle functionality
+        const smartBarToggle = document.getElementById('smartBarToggle');
+        if (smartBarToggle) {
+            smartBarToggle.addEventListener('click', () => {
+                this.toggleSmartBar();
             });
-        });
-        
-        document.querySelectorAll('.section-header h4').forEach(h4 => {
-            h4.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const header = h4.closest('.section-header');
-                this.toggleSection(header.dataset.section);
-            });
-        });
+        }
 
         // Note: Old Ask AI button and question input removed - now handled by bubble interface
 
@@ -90,8 +89,412 @@ class SidebarManager {
             apiKeyInput.focus();
         });
         
-        // Load saved section states
-        this.loadSectionStates();
+        // Load saved smart bar state
+        this.loadSmartBarState();
+    }
+
+    toggleSmartBar() {
+        const rightPanel = document.getElementById('rightPanel');
+        const smartBarToggle = document.getElementById('smartBarToggle');
+        
+        this.isCollapsed = !this.isCollapsed;
+        
+        if (this.isCollapsed) {
+            rightPanel.classList.add('collapsed');
+            smartBarToggle.textContent = '📖';
+            smartBarToggle.title = 'Show Smart Bar';
+        } else {
+            rightPanel.classList.remove('collapsed');
+            smartBarToggle.textContent = '📋';
+            smartBarToggle.title = 'Hide Smart Bar';
+        }
+        
+        // Save state
+        localStorage.setItem('vibeReader_smartBarCollapsed', this.isCollapsed);
+    }
+
+    loadSmartBarState() {
+        const saved = localStorage.getItem('vibeReader_smartBarCollapsed');
+        if (saved === 'true') {
+            this.toggleSmartBar();
+        }
+    }
+
+    addActivityItem(type, content, metadata = {}) {
+        const item = {
+            id: this.generateActivityId(),
+            type, // 'highlight', 'note', 'ai-chat', 'thinking'
+            content,
+            metadata,
+            timestamp: new Date()
+        };
+        
+        this.activityItems.push(item); // Add to end (bottom)
+        this.renderActivityFeed();
+        
+        // Auto-scroll to the bottom to show the new item
+        this.scrollToBottom();
+        
+        return item;
+    }
+
+    clearActivityItemsByType(type) {
+        // Remove all activity items of the specified type
+        this.activityItems = this.activityItems.filter(item => item.type !== type);
+        this.renderActivityFeed();
+    }
+
+    deleteActivityItem(activityId) {
+        // Find the activity item
+        const item = this.activityItems.find(item => item.id === activityId);
+        if (!item) return;
+
+        // Delete from the underlying data based on type
+        if (item.type === 'highlight' && item.metadata.highlightId) {
+            this.deleteHighlight(item.metadata.highlightId);
+        } else if (item.type === 'note' && item.metadata.noteId) {
+            this.deleteNote(item.metadata.noteId);
+        } else if (item.type === 'ai-chat' && item.metadata.answerId) {
+            this.deleteAskAnswer(item.metadata.answerId);
+        } else {
+            // For items without underlying data (like thinking placeholders), just remove from activity feed
+            this.activityItems = this.activityItems.filter(activityItem => activityItem.id !== activityId);
+            this.renderActivityFeed();
+        }
+    }
+
+    scrollToActivityItem(activityId) {
+        // Find the activity item
+        const item = this.activityItems.find(item => item.id === activityId);
+        if (!item) return;
+
+        // Get the reading container
+        const readingContainer = document.getElementById('readingContainer');
+        if (!readingContainer) return;
+
+        let targetElement = null;
+
+        // Find the target element based on item type
+        if (item.type === 'highlight' && item.metadata.highlightId) {
+            // Find the highlighted text in the DOM
+            targetElement = document.querySelector(`[data-highlight-id="${item.metadata.highlightId}"]`);
+        } else if (item.type === 'note' && item.metadata.noteId) {
+            // For notes, first try to find the note highlight element
+            targetElement = document.querySelector(`[data-note-id="${item.metadata.noteId}"]`);
+            // If not found, fall back to text search
+            if (!targetElement && item.metadata.selectedText) {
+                targetElement = this.findTextInContent(item.metadata.selectedText, readingContainer);
+            }
+        } else if (item.type === 'ai-chat') {
+            // For AI chats, search for the selected text
+            const textToFind = item.metadata.selectedText || item.metadata.originalText;
+            if (textToFind) {
+                targetElement = this.findTextInContent(textToFind, readingContainer);
+            }
+        }
+
+        // Scroll to the target element
+        if (targetElement) {
+            // Smooth scroll to the element
+            targetElement.scrollIntoView({
+                behavior: 'smooth',
+                block: 'center',
+                inline: 'nearest'
+            });
+
+            // Add a temporary highlight effect
+            this.addTemporaryHighlight(targetElement);
+        } else {
+            // If we can't find the exact element, show a message
+            if (this.app.modalManager) {
+                this.app.modalManager.showAlert('Unable to locate this item in the current book.');
+            } else {
+                alert('Unable to locate this item in the current book.');
+            }
+        }
+    }
+
+    findTextInContent(text, container) {
+        // More sophisticated text search that looks for exact matches
+        if (!text || text.length < 3) return null;
+        
+        // First try to find exact match
+        const walker = document.createTreeWalker(
+            container,
+            NodeFilter.SHOW_TEXT,
+            null,
+            false
+        );
+
+        let bestMatch = null;
+        let bestMatchScore = 0;
+        let node;
+        
+        while (node = walker.nextNode()) {
+            const nodeText = node.textContent;
+            
+            // Check for exact match first
+            if (nodeText.includes(text)) {
+                return node.parentElement;
+            }
+            
+            // Check for partial match (for longer text that might be split)
+            const searchText = text.substring(0, Math.min(text.length, 100));
+            if (nodeText.includes(searchText)) {
+                const score = searchText.length;
+                if (score > bestMatchScore) {
+                    bestMatch = node.parentElement;
+                    bestMatchScore = score;
+                }
+            }
+        }
+        
+        return bestMatch;
+    }
+
+    addTemporaryHighlight(element) {
+        // Add a temporary visual highlight to show what was clicked
+        const originalBackground = element.style.backgroundColor;
+        const originalTransition = element.style.transition;
+        
+        element.style.transition = 'background-color 0.3s ease';
+        element.style.backgroundColor = 'rgba(59, 130, 246, 0.3)'; // Blue highlight
+        
+        setTimeout(() => {
+            element.style.backgroundColor = originalBackground;
+            setTimeout(() => {
+                element.style.transition = originalTransition;
+            }, 300);
+        }, 1500);
+    }
+
+    scrollToBottom() {
+        // Auto-scroll the sidebar to the bottom to show new items
+        const smartBarContent = document.querySelector('.smart-bar-content');
+        if (smartBarContent) {
+            // Use setTimeout to ensure the DOM has been updated after renderActivityFeed
+            setTimeout(() => {
+                smartBarContent.scrollTo({
+                    top: smartBarContent.scrollHeight,
+                    behavior: 'smooth'
+                });
+            }, 100);
+        }
+    }
+
+    applyNoteHighlight(note) {
+        // Apply visual highlighting to text with notes (similar to highlights but different style)
+        try {
+            const range = this.preservedSelectedRange;
+            if (!range) {
+                console.warn('No preserved range available, using fallback method');
+                this.applyNoteHighlightFallback(note);
+                return;
+            }
+
+            // Create note highlight span
+            const noteSpan = document.createElement('span');
+            noteSpan.className = 'text-note-highlight';
+            noteSpan.setAttribute('data-note-id', note.id);
+            noteSpan.setAttribute('title', `Note: ${note.text.substring(0, 100)}${note.text.length > 100 ? '...' : ''}`);
+
+            // Wrap the selected text
+            range.surroundContents(noteSpan);
+            
+            // Clear the preserved range after use
+            this.preservedSelectedRange = null;
+            this.preservedSelectedText = null;
+        } catch (error) {
+            // Fallback: try to highlight by replacing text
+            console.warn('Failed to apply note highlight with surroundContents, trying fallback:', error);
+            this.applyNoteHighlightFallback(note);
+        }
+    }
+
+    applyNoteHighlightFallback(note) {
+        // Fallback method for applying note highlights
+        const readingContainer = document.getElementById('readingContainer');
+        if (!readingContainer || !note.selectedText) return;
+
+        // Find text nodes containing the selected text
+        const walker = document.createTreeWalker(
+            readingContainer,
+            NodeFilter.SHOW_TEXT,
+            null,
+            false
+        );
+
+        let node;
+        while (node = walker.nextNode()) {
+            const text = node.textContent;
+            const index = text.indexOf(note.selectedText);
+            
+            if (index !== -1) {
+                // Found the text, wrap it with note highlight
+                const parent = node.parentNode;
+                const beforeText = text.substring(0, index);
+                const noteText = text.substring(index, index + note.selectedText.length);
+                const afterText = text.substring(index + note.selectedText.length);
+                
+                const fragment = document.createDocumentFragment();
+                
+                if (beforeText) {
+                    fragment.appendChild(document.createTextNode(beforeText));
+                }
+                
+                const noteSpan = document.createElement('span');
+                noteSpan.className = 'text-note-highlight';
+                noteSpan.setAttribute('data-note-id', note.id);
+                noteSpan.setAttribute('title', `Note: ${note.text.substring(0, 100)}${note.text.length > 100 ? '...' : ''}`);
+                noteSpan.textContent = noteText;
+                fragment.appendChild(noteSpan);
+                
+                if (afterText) {
+                    fragment.appendChild(document.createTextNode(afterText));
+                }
+                
+                parent.replaceChild(fragment, node);
+                break; // Only highlight the first occurrence
+            }
+        }
+    }
+
+    updateActivityItem(id, updates) {
+        const itemIndex = this.activityItems.findIndex(item => item.id === id);
+        if (itemIndex !== -1) {
+            Object.assign(this.activityItems[itemIndex], updates);
+            this.renderActivityFeed();
+        }
+    }
+
+    removeActivityItem(id) {
+        this.activityItems = this.activityItems.filter(item => item.id !== id);
+        this.renderActivityFeed();
+    }
+
+    renderActivityFeed() {
+        const feed = document.getElementById('activityFeed');
+        if (!feed) return;
+        
+        if (this.activityItems.length === 0) {
+            feed.innerHTML = `
+                <div class="no-content-message">
+                    <p>📖 Your highlights, notes, and AI conversations will appear here as you read</p>
+                </div>
+            `;
+            return;
+        }
+        
+        const itemsHTML = this.activityItems.map(item => this.renderActivityItem(item)).join('');
+        feed.innerHTML = itemsHTML;
+    }
+
+    renderActivityItem(item) {
+        const timeStr = this.formatTime(item.timestamp);
+        const icons = {
+            highlight: '🎨',
+            note: '📝',
+            'ai-chat': '🤖',
+            thinking: '🤔'
+        };
+        
+        let contentHTML = '';
+        let actionsHTML = '';
+        
+        if (item.type === 'thinking') {
+            contentHTML = `
+                <div class="activity-content">
+                    <div class="thinking-spinner"></div>
+                    ${item.content}
+                </div>
+            `;
+        } else {
+            const isLong = item.content.length > 150;
+            contentHTML = `
+                <div class="activity-content ${isLong ? 'preview' : ''}" id="content-${item.id}">
+                    ${this.escapeHTML(isLong ? item.content.substring(0, 150) + '...' : item.content)}
+                </div>
+            `;
+            
+            actionsHTML = `
+                <div class="activity-actions">
+                    ${isLong ? `<button class="activity-btn" onclick="event.stopPropagation(); window.app.sidebar.expandItem('${item.id}')">Expand</button>` : ''}
+                    <button class="activity-btn" onclick="event.stopPropagation(); window.app.sidebar.deleteActivityItem('${item.id}')">Delete</button>
+                </div>
+            `;
+        }
+        
+        return `
+            <div class="activity-item ${item.type}" data-id="${item.id}" onclick="window.app.sidebar.scrollToActivityItem('${item.id}')" style="cursor: pointer;">
+                <div class="activity-header">
+                    <div class="activity-type">
+                        <span>${icons[item.type] || '📄'}</span>
+                        <span>${item.type.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}</span>
+                    </div>
+                    <div class="activity-time">${timeStr}</div>
+                </div>
+                ${contentHTML}
+                ${actionsHTML}
+            </div>
+        `;
+    }
+
+    expandItem(id) {
+        const item = this.activityItems.find(i => i.id === id);
+        if (!item) return;
+        
+        this.modalManager.showModal({
+            id: `expand-${id}`,
+            title: `${item.type.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())} - ${this.formatTime(item.timestamp)}`,
+            content: `<div class="expanded-content">${this.escapeHTML(item.content)}</div>`,
+            buttons: [
+                { text: 'Close', action: 'close', primary: true }
+            ],
+            className: 'expand-modal'
+        });
+    }
+
+    generateActivityId() {
+        return 'activity_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    }
+
+    // Method to immediately show AI chat with thinking placeholder
+    addThinkingAIChat(question, selectedText) {
+        const thinkingItem = this.addActivityItem('thinking', 'Thinking about your question...', {
+            question,
+            selectedText,
+            isThinking: true
+        });
+        
+        return thinkingItem.id;
+    }
+
+    // Method to update thinking item with actual AI response
+    updateAIChat(thinkingId, answer) {
+        const item = this.activityItems.find(i => i.id === thinkingId);
+        if (item && item.metadata.isThinking) {
+            const content = `Q: ${item.metadata.question}\n\nSelected: "${item.metadata.selectedText}"\n\nA: ${answer}`;
+            
+            this.updateActivityItem(thinkingId, {
+                type: 'ai-chat',
+                content: content,
+                metadata: {
+                    ...item.metadata,
+                    answer: answer,
+                    isThinking: false
+                }
+            });
+        }
+    }
+
+    formatTime(date) {
+        const now = new Date();
+        const diff = now - date;
+        
+        if (diff < 60000) return 'Just now';
+        if (diff < 3600000) return Math.floor(diff / 60000) + 'm ago';
+        if (diff < 86400000) return Math.floor(diff / 3600000) + 'h ago';
+        return date.toLocaleDateString();
     }
 
     toggleSection(sectionName) {
@@ -157,86 +560,59 @@ class SidebarManager {
     }
 
     displayHighlights(highlights) {
-        const highlightsContainer = document.getElementById('highlightsContainer');
+        // Clear existing highlights from activity feed first
+        this.clearActivityItemsByType('highlight');
         
-        if (!highlights || highlights.length === 0) {
-            highlightsContainer.innerHTML = '<div class="no-content-message"><p>Select text and highlight to save important passages</p></div>';
-            return;
+        // Convert highlights to activity feed items
+        if (highlights && highlights.length > 0) {
+            highlights.forEach(highlight => {
+                this.addActivityItem('highlight', highlight.text, {
+                    highlightId: highlight.id,
+                    originalText: highlight.text,
+                    chapter: highlight.chapter,
+                    timestamp: highlight.timestamp
+                });
+            });
         }
-
-        const highlightsHTML = highlights.map(highlight => `
-            <div class="highlight-item" data-highlight-id="${highlight.id}">
-                <div class="highlight-text">${this.escapeHTML(highlight.text)}</div>
-                <div class="item-meta">
-                    <span>Chapter ${highlight.chapter + 1} • ${new Date(highlight.timestamp).toLocaleDateString()}</span>
-                    <button class="delete-btn" onclick="app.sidebar.deleteHighlight('${highlight.id}')">🗑️</button>
-                </div>
-            </div>
-        `).join('');
-
-        highlightsContainer.innerHTML = highlightsHTML;
     }
 
     displayNotes(notes) {
-        const notesContainer = document.getElementById('notesContainer');
+        // Clear existing notes from activity feed first
+        this.clearActivityItemsByType('note');
         
-        if (!notes || notes.length === 0) {
-            notesContainer.innerHTML = '<div class="no-content-message"><p>Add personal notes and thoughts while reading</p></div>';
-            return;
+        // Convert notes to activity feed items
+        if (notes && notes.length > 0) {
+            notes.forEach(note => {
+                const content = note.selectedText 
+                    ? `Selected: "${note.selectedText}"\n\nNote: ${note.text}`
+                    : note.text;
+                    
+                this.addActivityItem('note', content, {
+                    noteId: note.id,
+                    originalText: note.text,
+                    selectedText: note.selectedText,
+                    chapter: note.chapter,
+                    timestamp: note.timestamp
+                });
+            });
         }
-
-        const notesHTML = notes.map(note => `
-            <div class="note-item" data-note-id="${note.id}">
-                ${note.selectedText ? `<div class="highlight-text">${this.escapeHTML(note.selectedText)}</div>` : ''}
-                <div class="note-text">${this.escapeHTML(note.text)}</div>
-                <div class="item-meta">
-                    <span>Chapter ${note.chapter + 1} • ${new Date(note.timestamp).toLocaleDateString()}</span>
-                    <button class="delete-btn" onclick="app.sidebar.deleteNote('${note.id}')">🗑️</button>
-                </div>
-            </div>
-        `).join('');
-
-        notesContainer.innerHTML = notesHTML;
     }
 
     displayAskAnswers(askAnswers) {
-        const askAnswersContainer = document.getElementById('askAnswersList');
-        
-        if (!askAnswers || askAnswers.length === 0) {
-            askAnswersContainer.innerHTML = `
-                <div class="no-content-message">
-                    <p>Select text and ask AI questions to see answers here!</p>
-                </div>
-            `;
-            return;
+        // Convert AI answers to activity feed items
+        if (askAnswers && askAnswers.length > 0) {
+            askAnswers.forEach(answer => {
+                const content = `Q: ${answer.question}\n\nSelected: "${answer.selectedText}"\n\nA: ${answer.answer}`;
+                
+                this.addActivityItem('ai-chat', content, {
+                    answerId: answer.id,
+                    question: answer.question,
+                    answer: answer.answer,
+                    selectedText: answer.selectedText,
+                    timestamp: answer.timestamp
+                });
+            });
         }
-
-        const answersHTML = askAnswers.map(answer => {
-            const truncatedResponse = answer.answer.length > 200 
-                ? answer.answer.substring(0, 200) + '...' 
-                : answer.answer;
-            
-            const truncatedSelectedText = answer.selectedText.length > 80 
-                ? answer.selectedText.substring(0, 80) + '...' 
-                : answer.selectedText;
-
-            return `
-                <div class="ask-answer-item" data-answer-id="${answer.id}">
-                    <div class="ask-answer-question">${this.escapeHTML(answer.question)}</div>
-                    <div class="ask-answer-selected-text">"${this.escapeHTML(truncatedSelectedText)}"</div>
-                    <div class="ask-answer-response">${this.escapeHTML(truncatedResponse)}</div>
-                    <div class="ask-answer-meta">
-                        <span class="ask-answer-timestamp">${new Date(answer.timestamp).toLocaleDateString()}</span>
-                        <div class="ask-answer-actions">
-                            <button class="ask-answer-action" onclick="app.sidebar.expandAnswer('${answer.id}')" title="View full answer">📖 Expand</button>
-                            <button class="ask-answer-action" onclick="app.sidebar.deleteAskAnswer('${answer.id}')" title="Delete answer">🗑️ Delete</button>
-                        </div>
-                    </div>
-                </div>
-            `;
-        }).join('');
-
-        askAnswersContainer.innerHTML = answersHTML;
     }
 
     expandAnswer(answerId) {
@@ -290,6 +666,11 @@ class SidebarManager {
                 timestamp: new Date().toISOString(),
                 chapter: this.getCurrentChapter()
             };
+
+            // Apply visual highlighting to the selected text (like highlights do)
+            if (note.selectedText && this.preservedSelectedRange) {
+                this.applyNoteHighlight(note);
+            }
 
             // Save to storage
             const notes = this.app.storage.getNotes(currentBook.id);
@@ -450,13 +831,19 @@ class SidebarManager {
     }
 
     showError(message) {
-        // Simple error display - could be enhanced with a proper notification system
-        alert('Error: ' + message);
+        if (this.modalManager) {
+            this.modalManager.showAlert(message, 'error');
+        } else {
+            alert('Error: ' + message);
+        }
     }
 
     showSuccess(message) {
-        // Simple success display - could be enhanced with a proper notification system
-        alert(message);
+        if (this.modalManager) {
+            this.modalManager.showAlert(message, 'success');
+        } else {
+            alert(message);
+        }
     }
 }
 

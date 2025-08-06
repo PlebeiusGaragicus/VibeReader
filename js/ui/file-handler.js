@@ -241,19 +241,137 @@ class FileHandler {
 
         // Apply highlights to content
         this.applyHighlights(highlights);
+        
+        // Apply notes to content
+        this.applyNotes(notes);
     }
 
     applyHighlights(highlights) {
         highlights.forEach(highlight => {
             try {
-                const element = document.querySelector(`[data-highlight-id="${highlight.id}"]`);
-                if (element) {
-                    element.classList.add('text-highlight');
+                // Check if highlight already exists in DOM
+                const existingElement = document.querySelector(`[data-highlight-id="${highlight.id}"]`);
+                if (existingElement) {
+                    return; // Already applied
                 }
+                
+                // Apply highlight by finding and wrapping the text
+                this.applyHighlightToText(highlight);
             } catch (error) {
                 console.warn('Failed to apply highlight:', error);
             }
         });
+    }
+
+    applyHighlightToText(highlight) {
+        const readingContainer = document.getElementById('readingContainer');
+        if (!readingContainer || !highlight.text) return;
+
+        // Find text nodes containing the highlighted text
+        const walker = document.createTreeWalker(
+            readingContainer,
+            NodeFilter.SHOW_TEXT,
+            null,
+            false
+        );
+
+        let node;
+        while (node = walker.nextNode()) {
+            const text = node.textContent;
+            const index = text.indexOf(highlight.text);
+            
+            if (index !== -1) {
+                // Found the text, wrap it with highlight
+                const parent = node.parentNode;
+                const beforeText = text.substring(0, index);
+                const highlightText = text.substring(index, index + highlight.text.length);
+                const afterText = text.substring(index + highlight.text.length);
+                
+                const fragment = document.createDocumentFragment();
+                
+                if (beforeText) {
+                    fragment.appendChild(document.createTextNode(beforeText));
+                }
+                
+                const highlightSpan = document.createElement('span');
+                highlightSpan.className = 'text-highlight';
+                highlightSpan.setAttribute('data-highlight-id', highlight.id);
+                highlightSpan.setAttribute('title', `Highlighted on ${new Date(highlight.timestamp).toLocaleDateString()}`);
+                highlightSpan.textContent = highlightText;
+                fragment.appendChild(highlightSpan);
+                
+                if (afterText) {
+                    fragment.appendChild(document.createTextNode(afterText));
+                }
+                
+                parent.replaceChild(fragment, node);
+                break; // Only highlight the first occurrence
+            }
+        }
+    }
+
+    applyNotes(notes) {
+        notes.forEach(note => {
+            try {
+                // Check if note already exists in DOM
+                const existingElement = document.querySelector(`[data-note-id="${note.id}"]`);
+                if (existingElement) {
+                    return; // Already applied
+                }
+                
+                // Apply note highlight by finding and wrapping the text
+                this.applyNoteToText(note);
+            } catch (error) {
+                console.warn('Failed to apply note:', error);
+            }
+        });
+    }
+
+    applyNoteToText(note) {
+        const readingContainer = document.getElementById('readingContainer');
+        if (!readingContainer || !note.selectedText) return;
+
+        // Find text nodes containing the note text
+        const walker = document.createTreeWalker(
+            readingContainer,
+            NodeFilter.SHOW_TEXT,
+            null,
+            false
+        );
+
+        let node;
+        while (node = walker.nextNode()) {
+            const text = node.textContent;
+            const index = text.indexOf(note.selectedText);
+            
+            if (index !== -1) {
+                // Found the text, wrap it with note highlight
+                const parent = node.parentNode;
+                const beforeText = text.substring(0, index);
+                const noteText = text.substring(index, index + note.selectedText.length);
+                const afterText = text.substring(index + note.selectedText.length);
+                
+                const fragment = document.createDocumentFragment();
+                
+                if (beforeText) {
+                    fragment.appendChild(document.createTextNode(beforeText));
+                }
+                
+                const noteSpan = document.createElement('span');
+                noteSpan.className = 'text-note-highlight';
+                noteSpan.setAttribute('data-note-id', note.id);
+                noteSpan.setAttribute('title', `Note: ${note.text.substring(0, 100)}${note.text.length > 100 ? '...' : ''}`);
+                noteSpan.textContent = noteText;
+                fragment.appendChild(noteSpan);
+                
+                if (afterText) {
+                    fragment.appendChild(document.createTextNode(afterText));
+                }
+                
+                parent.replaceChild(fragment, node);
+                break; // Only highlight the first occurrence
+            }
+        }
     }
 
     navigateToChapter(chapterIndex) {

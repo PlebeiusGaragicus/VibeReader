@@ -12,7 +12,7 @@ NC='\033[0m' # No Color
 
 # Configuration
 PORT=8081
-HOST="localhost"
+HOST="0.0.0.0"
 
 echo -e "${BLUE}🚀 Starting VibeReader Development Server${NC}"
 echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
@@ -60,12 +60,15 @@ echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━�
 
 # Start the server with enhanced logging
 if [ "$PYTHON_CMD" = "python3" ]; then
-    # Python 3 version with enhanced logging
+    # Python 3 version with enhanced logging and proper cleanup
     $PYTHON_CMD -c "
 import http.server
 import socketserver
+import socket
 import os
 import datetime
+import signal
+import sys
 from urllib.parse import unquote
 
 class CustomHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
@@ -87,19 +90,50 @@ class CustomHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
         print(f'📤 POST {path} from {client_ip}')
         super().do_POST()
 
+class ReusableTCPServer(socketserver.TCPServer):
+    allow_reuse_address = True
+    
+    def server_bind(self):
+        self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        super().server_bind()
+
+# Global server reference for cleanup
+httpd = None
+
+def signal_handler(signum, frame):
+    print('\n🛑 Server stopped by user')
+    if httpd:
+        httpd.shutdown()
+        httpd.server_close()
+    sys.exit(0)
+
+# Register signal handlers
+signal.signal(signal.SIGINT, signal_handler)
+signal.signal(signal.SIGTERM, signal_handler)
+
 # Change to the script directory
 os.chdir('$(pwd)')
 
-# Start server
-with socketserver.TCPServer(('$HOST', $PORT), CustomHTTPRequestHandler) as httpd:
+# Start server with proper cleanup
+try:
+    httpd = ReusableTCPServer(('$HOST', $PORT), CustomHTTPRequestHandler)
     print(f'🚀 Server running at http://$HOST:$PORT/')
     print(f'📁 Serving files from: {os.getcwd()}')
     print(f'🔄 Press Ctrl+C to stop the server')
     print('━' * 50)
-    try:
-        httpd.serve_forever()
-    except KeyboardInterrupt:
-        print('\n🛑 Server stopped by user')
+    httpd.serve_forever()
+except OSError as e:
+    if e.errno == 48:  # Address already in use
+        print('❌ Port $PORT is already in use!')
+        print('💡 Try killing any existing processes:')
+        print('   lsof -ti:$PORT | xargs kill -9')
+        print('   Or wait a few seconds and try again.')
+    else:
+        print(f'❌ Server error: {e}')
+    sys.exit(1)
+finally:
+    if httpd:
+        httpd.server_close()
 "
 else
     # Python 2 fallback

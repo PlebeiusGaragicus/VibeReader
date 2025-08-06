@@ -82,56 +82,19 @@
 
             <!-- Right Panel: Smart Sidebar -->
             <aside class="right-panel" id="rightPanel">
+                <div class="smart-bar-header">
+                    <h3 class="smart-bar-title">📚 Smart Bar</h3>
+                    <div class="smart-bar-controls">
+                        <button id="smartBarToggle" class="icon-btn" title="Toggle Smart Bar">📋</button>
+                        <button id="settingsBtn" class="icon-btn" title="Settings">⚙️</button>
+                    </div>
+                </div>
                 
-                <!-- AI Q&A Section -->
-                <div class="sidebar-section">
-                    <div class="section-header">
-                        <button class="section-toggle" aria-expanded="true">
-                            <span class="toggle-icon">▼</span>
-                        </button>
-                        <h4>💬 Ask Answers</h4>
-                    </div>
-                    <div class="section-content" id="askAnswersContent">
-                        <div class="ask-answers-container">
-                            <div class="ask-answers-list" id="askAnswersList">
-                                <div class="no-content-message">
-                                    <p>Select text and ask AI questions to see answers here!</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Highlights Section -->
-                <div class="sidebar-section">
-                    <div class="section-header" data-section="highlights">
-                        <button class="section-toggle" aria-expanded="true">
-                            <span class="toggle-icon">▼</span>
-                        </button>
-                        <h4>🎨 Highlights</h4>
-                    </div>
-                    <div class="section-content" id="highlightsContent">
-                        <div class="highlights-container" id="highlightsContainer">
-                            <div class="no-content-message">
-                                <p>Select text and highlight to save important passages</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Notes Section -->
-                <div class="sidebar-section">
-                    <div class="section-header" data-section="notes">
-                        <button class="section-toggle" aria-expanded="true">
-                            <span class="toggle-icon">▼</span>
-                        </button>
-                        <h4>📝 Notes</h4>
-                    </div>
-                    <div class="section-content" id="notesContent">
-                        <div class="notes-container" id="notesContainer">
-                            <div class="no-content-message">
-                                <p>Add personal notes and thoughts while reading</p>
-                            </div>
+                <div class="smart-bar-content" id="smartBarContent">
+                    <!-- Unified Activity Feed -->
+                    <div class="activity-feed" id="activityFeed">
+                        <div class="no-content-message">
+                            <p>📖 Your highlights, notes, and AI conversations will appear here as you read</p>
                         </div>
                     </div>
                 </div>
@@ -225,6 +188,7 @@
     <script src="js/utils/storage.js"></script>
     <script src="js/utils/theme-manager.js"></script>
     <script src="js/utils/scroll-manager.js"></script>
+    <script src="js/utils/modal-manager.js"></script>
     <script src="js/parsers/epub-parser.js"></script>
     <script src="js/parsers/mobi-parser.js"></script>
     <script src="js/ui/file-handler.js"></script>
