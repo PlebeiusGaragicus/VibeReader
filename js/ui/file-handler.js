@@ -364,6 +364,13 @@ class FileHandler {
                 noteSpan.textContent = noteText;
                 fragment.appendChild(noteSpan);
                 
+                // Add note popup functionality after DOM insertion
+                setTimeout(() => {
+                    if (this.app.sidebar && this.app.sidebar.addNotePopupEvents) {
+                        this.app.sidebar.addNotePopupEvents(noteSpan, note);
+                    }
+                }, 0);
+                
                 if (afterText) {
                     fragment.appendChild(document.createTextNode(afterText));
                 }

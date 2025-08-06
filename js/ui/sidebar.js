@@ -282,6 +282,135 @@ class SidebarManager {
         }
     }
 
+    addNotePopupEvents(noteSpan, note) {
+        let popup = null;
+        let hideTimeout = null;
+
+        const showPopup = (e) => {
+            // Clear any existing hide timeout
+            if (hideTimeout) {
+                clearTimeout(hideTimeout);
+                hideTimeout = null;
+            }
+
+            // Remove any existing popup
+            this.hideAllNotePopups();
+
+            // Create popup element
+            popup = document.createElement('div');
+            popup.className = 'note-popup';
+            popup.innerHTML = `
+                <div class="note-popup-header">
+                    <span>📝</span>
+                    <span>Note</span>
+                </div>
+                <div class="note-popup-content">${this.escapeHTML(note.text)}</div>
+            `;
+
+            // Position popup
+            document.body.appendChild(popup);
+            const rect = noteSpan.getBoundingClientRect();
+            const popupRect = popup.getBoundingClientRect();
+            
+            let left = rect.left + (rect.width / 2) - (popupRect.width / 2);
+            let top = rect.bottom + 8;
+
+            // Adjust if popup goes off screen
+            if (left < 10) left = 10;
+            if (left + popupRect.width > window.innerWidth - 10) {
+                left = window.innerWidth - popupRect.width - 10;
+            }
+            if (top + popupRect.height > window.innerHeight - 10) {
+                top = rect.top - popupRect.height - 8;
+            }
+
+            popup.style.left = `${left}px`;
+            popup.style.top = `${top}px`;
+
+            // Show with animation
+            setTimeout(() => {
+                popup.classList.add('show');
+                // Add hover events to popup after it's shown
+                popup.addEventListener('mouseenter', cancelHide);
+                popup.addEventListener('mouseleave', scheduleHide);
+            }, 10);
+        };
+
+        const hidePopup = () => {
+            if (popup) {
+                popup.classList.remove('show');
+                setTimeout(() => {
+                    if (popup && popup.parentNode) {
+                        popup.parentNode.removeChild(popup);
+                    }
+                    popup = null;
+                }, 300);
+            }
+        };
+
+        const scheduleHide = () => {
+            hideTimeout = setTimeout(hidePopup, 800); // Increased delay
+        };
+
+        const cancelHide = () => {
+            if (hideTimeout) {
+                clearTimeout(hideTimeout);
+                hideTimeout = null;
+            }
+        };
+
+        // Event listeners for note span
+        noteSpan.addEventListener('mouseenter', showPopup);
+        noteSpan.addEventListener('mouseleave', scheduleHide);
+        noteSpan.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (popup && popup.classList.contains('show')) {
+                hidePopup();
+            } else {
+                showPopup(e);
+            }
+        });
+
+        // Add popup hover events after popup is created
+        const addPopupHoverEvents = () => {
+            if (popup) {
+                popup.addEventListener('mouseenter', cancelHide);
+                popup.addEventListener('mouseleave', scheduleHide);
+            }
+        };
+
+        // Store reference for cleanup and popup events
+        noteSpan._notePopupEvents = { showPopup, hidePopup, scheduleHide, cancelHide };
+    }
+
+    hideAllNotePopups() {
+        const existingPopups = document.querySelectorAll('.note-popup');
+        existingPopups.forEach(popup => {
+            popup.classList.remove('show');
+            setTimeout(() => {
+                if (popup.parentNode) {
+                    popup.parentNode.removeChild(popup);
+                }
+            }, 300);
+        });
+    }
+
+    removeNoteHighlight(noteId) {
+        const noteElement = document.querySelector(`[data-note-id="${noteId}"]`);
+        if (noteElement) {
+            // Hide any popup for this note first
+            this.hideAllNotePopups();
+            
+            // Replace note span with its text content
+            const parent = noteElement.parentNode;
+            const textNode = document.createTextNode(noteElement.textContent);
+            parent.replaceChild(textNode, noteElement);
+            
+            // Normalize the parent to merge adjacent text nodes
+            parent.normalize();
+        }
+    }
+
     applyNoteHighlight(note) {
         // Apply visual highlighting to text with notes (similar to highlights but different style)
         try {
@@ -300,6 +429,9 @@ class SidebarManager {
 
             // Wrap the selected text
             range.surroundContents(noteSpan);
+            
+            // Add note popup functionality
+            this.addNotePopupEvents(noteSpan, note);
             
             // Clear the preserved range after use
             this.preservedSelectedRange = null;
@@ -348,6 +480,9 @@ class SidebarManager {
                 noteSpan.setAttribute('title', `Note: ${note.text.substring(0, 100)}${note.text.length > 100 ? '...' : ''}`);
                 noteSpan.textContent = noteText;
                 fragment.appendChild(noteSpan);
+                
+                // Add note popup functionality
+                setTimeout(() => this.addNotePopupEvents(noteSpan, note), 0);
                 
                 if (afterText) {
                     fragment.appendChild(document.createTextNode(afterText));
@@ -711,6 +846,9 @@ class SidebarManager {
     deleteNote(noteId) {
         const currentBook = this.app.fileHandler.getCurrentBook();
         if (!currentBook) return;
+
+        // Remove the note highlight from the DOM first
+        this.removeNoteHighlight(noteId);
 
         const notes = this.app.storage.getNotes(currentBook.id);
         const updatedNotes = notes.filter(note => note.id !== noteId);
