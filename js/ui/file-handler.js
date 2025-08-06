@@ -170,14 +170,9 @@ class FileHandler {
 
         readingContainer.innerHTML = contentHTML;
 
-        // Setup scroll tracking for progress
-        this.setupScrollTracking();
 
-        // Navigate to saved position
-        const progress = this.app.storage.getProgress(this.currentBook.id);
-        if (progress.chapter > 0) {
-            this.navigateToChapter(progress.chapter);
-        }
+
+
     }
 
     loadUserData(bookId) {
@@ -225,69 +220,15 @@ class FileHandler {
                 tocItem.classList.add('active');
             }
 
-            // Save progress
-            this.updateProgress(chapterIndex);
+
         }
     }
 
-    setupScrollTracking() {
-        const readingContainer = document.getElementById('readingContainer');
-        let scrollTimeout;
 
-        readingContainer.addEventListener('scroll', () => {
-            clearTimeout(scrollTimeout);
-            scrollTimeout = setTimeout(() => {
-                this.updateProgressFromScroll();
-            }, 100);
-        });
-    }
 
-    updateProgressFromScroll() {
-        const readingContainer = document.getElementById('readingContainer');
-        const chapters = readingContainer.querySelectorAll('.chapter');
-        
-        if (chapters.length === 0) return;
 
-        const containerRect = readingContainer.getBoundingClientRect();
-        const containerCenter = containerRect.top + containerRect.height / 2;
 
-        let currentChapter = 0;
-        let minDistance = Infinity;
 
-        chapters.forEach((chapter, index) => {
-            const chapterRect = chapter.getBoundingClientRect();
-            const chapterCenter = chapterRect.top + chapterRect.height / 2;
-            const distance = Math.abs(containerCenter - chapterCenter);
-
-            if (distance < minDistance) {
-                minDistance = distance;
-                currentChapter = index;
-            }
-        });
-
-        this.updateProgress(currentChapter);
-    }
-
-    updateProgress(chapterIndex) {
-        if (!this.currentBook) return;
-
-        const totalChapters = this.currentBook.content.length;
-        const percentage = Math.round((chapterIndex / Math.max(1, totalChapters - 1)) * 100);
-
-        // Update progress bar
-        const progressFill = document.getElementById('progressFill');
-        const progressText = document.getElementById('progressText');
-        
-        if (progressFill) progressFill.style.width = `${percentage}%`;
-        if (progressText) progressText.textContent = `${percentage}%`;
-
-        // Save progress
-        this.app.storage.saveProgress(this.currentBook.id, {
-            chapter: chapterIndex,
-            position: 0,
-            percentage: percentage
-        });
-    }
 
     enableAIFeatures() {
         const askBtn = document.getElementById('askBtn');

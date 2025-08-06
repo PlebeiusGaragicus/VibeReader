@@ -293,8 +293,7 @@ class VibeReaderApp {
             },
             highlights: this.storage.getHighlights(currentBook.id),
             notes: this.storage.getNotes(currentBook.id),
-            qaHistory: this.storage.getQAHistory(currentBook.id),
-            progress: this.storage.getProgress(currentBook.id)
+            qaHistory: this.storage.getQAHistory(currentBook.id)
         };
     }
 
@@ -316,10 +315,6 @@ class VibeReaderApp {
             if (data.qaHistory) {
                 this.storage.saveQAHistory(currentBook.id, data.qaHistory);
                 this.sidebar.displayQAHistory(data.qaHistory);
-            }
-            
-            if (data.progress) {
-                this.storage.saveProgress(currentBook.id, data.progress);
             }
             
             return true;
