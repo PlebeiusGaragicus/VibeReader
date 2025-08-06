@@ -7,17 +7,52 @@ class SidebarManager {
     }
 
     setupEventListeners() {
+        // Collapsible section toggles - only on toggle button and header text
+        document.querySelectorAll('.section-toggle').forEach(toggle => {
+            toggle.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const header = toggle.closest('.section-header');
+                this.toggleSection(header.dataset.section);
+            });
+        });
+        
+        document.querySelectorAll('.section-header h4').forEach(h4 => {
+            h4.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const header = h4.closest('.section-header');
+                this.toggleSection(header.dataset.section);
+            });
+        });
+
         // Ask AI button
         document.getElementById('askBtn').addEventListener('click', () => {
             this.handleAIQuestion();
         });
 
-        // Question input enter key
-        document.getElementById('questionInput').addEventListener('keypress', (e) => {
+        // Question input enter key and comprehensive focus handling
+        const questionInput = document.getElementById('questionInput');
+        
+        // Prevent all event bubbling for the input
+        ['mousedown', 'mouseup', 'click', 'focus', 'blur', 'keydown', 'keyup', 'keypress'].forEach(eventType => {
+            questionInput.addEventListener(eventType, (e) => {
+                e.stopPropagation();
+                e.stopImmediatePropagation();
+            });
+        });
+        
+        // Handle Enter key separately
+        questionInput.addEventListener('keypress', (e) => {
+            e.stopPropagation();
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
                 this.handleAIQuestion();
             }
+        });
+        
+        // Ensure input stays focusable
+        questionInput.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            questionInput.focus();
         });
 
         // Note modal events
@@ -49,9 +84,98 @@ class SidebarManager {
         document.getElementById('closeSettingsModal').addEventListener('click', () => {
             this.closeSettingsModal();
         });
+        
+        // Fix focus persistence for note textarea in modal
+        const noteTextarea = document.getElementById('noteTextarea');
+        
+        // Prevent all event bubbling for the textarea
+        ['mousedown', 'mouseup', 'click', 'focus', 'blur', 'keydown', 'keyup', 'keypress'].forEach(eventType => {
+            noteTextarea.addEventListener(eventType, (e) => {
+                e.stopPropagation();
+                e.stopImmediatePropagation();
+            });
+        });
+        
+        // Ensure textarea stays focusable
+        noteTextarea.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            noteTextarea.focus();
+        });
+        
+        // Fix focus persistence for API key input in settings modal
+        const apiKeyInput = document.getElementById('apiKey');
+        
+        // Prevent all event bubbling for the API key input
+        ['mousedown', 'mouseup', 'click', 'focus', 'blur', 'keydown', 'keyup', 'keypress'].forEach(eventType => {
+            apiKeyInput.addEventListener(eventType, (e) => {
+                e.stopPropagation();
+                e.stopImmediatePropagation();
+            });
+        });
+        
+        // Ensure API key input stays focusable
+        apiKeyInput.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            apiKeyInput.focus();
+        });
+        
+        // Load saved section states
+        this.loadSectionStates();
     }
 
-    // togglePanel method removed - collapse functionality no longer needed
+    toggleSection(sectionName) {
+        const header = document.querySelector(`[data-section="${sectionName}"]`);
+        const content = document.getElementById(`${sectionName}Content`);
+        const sidebarSection = header.closest('.sidebar-section');
+        const toggle = header.querySelector('.section-toggle');
+        const isExpanded = toggle.getAttribute('aria-expanded') === 'true';
+        
+        if (isExpanded) {
+            // Collapse
+            content.classList.add('collapsed');
+            sidebarSection.classList.add('collapsed');
+            toggle.setAttribute('aria-expanded', 'false');
+        } else {
+            // Expand
+            content.classList.remove('collapsed');
+            sidebarSection.classList.remove('collapsed');
+            toggle.setAttribute('aria-expanded', 'true');
+        }
+        
+        // Save state to localStorage
+        this.saveSectionState(sectionName, !isExpanded);
+    }
+    
+    saveSectionState(sectionName, isExpanded) {
+        const sectionStates = JSON.parse(localStorage.getItem('vibeReader_sectionStates') || '{}');
+        sectionStates[sectionName] = isExpanded;
+        localStorage.setItem('vibeReader_sectionStates', JSON.stringify(sectionStates));
+    }
+    
+    loadSectionStates() {
+        const sectionStates = JSON.parse(localStorage.getItem('vibeReader_sectionStates') || '{}');
+        const sections = ['askAI', 'highlights', 'notes'];
+        
+        sections.forEach(sectionName => {
+            const isExpanded = sectionStates[sectionName] !== false; // Default to expanded
+            const header = document.querySelector(`[data-section="${sectionName}"]`);
+            const content = document.getElementById(`${sectionName}Content`);
+            const sidebarSection = header?.closest('.sidebar-section');
+            const toggle = header?.querySelector('.section-toggle');
+            
+            if (header && content && toggle && sidebarSection) {
+                if (isExpanded) {
+                    content.classList.remove('collapsed');
+                    sidebarSection.classList.remove('collapsed');
+                    toggle.setAttribute('aria-expanded', 'true');
+                } else {
+                    content.classList.add('collapsed');
+                    sidebarSection.classList.add('collapsed');
+                    toggle.setAttribute('aria-expanded', 'false');
+                }
+            }
+        });
+    }
 
     async handleAIQuestion() {
         const questionInput = document.getElementById('questionInput');
@@ -241,26 +365,38 @@ class SidebarManager {
     openSettingsModal() {
         const settingsModal = document.getElementById('settingsModal');
         const settings = this.app.storage.getSettings();
+        
+        // Try to load API key from cookies if not in localStorage
+        let apiKey = settings.apiKey;
+        if (!apiKey) {
+            apiKey = this.getApiKeyFromCookie();
+        }
 
-        // Populate form
-        document.getElementById('apiEndpoint').value = settings.apiEndpoint || '';
-        document.getElementById('apiKey').value = settings.apiKey || '';
-        document.getElementById('aiModel').value = settings.aiModel || 'gpt-3.5-turbo';
+        // Populate form with defaults
+        document.getElementById('apiEndpoint').value = 'https://webui.plebchat.me/ollama/v1';
+        document.getElementById('apiKey').value = apiKey || '';
+        document.getElementById('aiModel').value = settings.aiModel || 'gemma3:27b-it-q8_0';
 
         settingsModal.classList.remove('hidden');
+    }
+    
+    getApiKeyFromCookie() {
+        const cookies = document.cookie.split(';');
+        for (let cookie of cookies) {
+            const [name, value] = cookie.trim().split('=');
+            if (name === 'vibeReader_apiKey') {
+                return decodeURIComponent(value);
+            }
+        }
+        return null;
     }
 
     saveSettings() {
         const settings = {
-            apiEndpoint: document.getElementById('apiEndpoint').value.trim(),
+            apiEndpoint: 'https://webui.plebchat.me/ollama/v1', // Hardcoded endpoint
             apiKey: document.getElementById('apiKey').value.trim(),
             aiModel: document.getElementById('aiModel').value
         };
-
-        if (!settings.apiEndpoint) {
-            this.showError('Please enter an API endpoint');
-            return;
-        }
 
         if (!settings.apiKey) {
             this.showError('Please enter an API key');
@@ -271,6 +407,10 @@ class SidebarManager {
             this.app.storage.saveSettings(settings);
             this.closeSettingsModal();
             this.showSuccess('Settings saved successfully');
+            
+            // Also save API key to cookies as backup
+            document.cookie = `vibeReader_apiKey=${settings.apiKey}; expires=${new Date(Date.now() + 365*24*60*60*1000).toUTCString()}; path=/; SameSite=Strict`;
+            
         } catch (error) {
             console.error('Failed to save settings:', error);
             this.showError('Failed to save settings');

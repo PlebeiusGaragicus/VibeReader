@@ -114,6 +114,8 @@ body {
 .right-panel {
     border-right: none;
     border-left: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
 }
 
 .panel-header {
@@ -243,14 +245,143 @@ body {
 /* Sidebar Sections */
 .sidebar-section {
     border-bottom: 1px solid var(--border-color);
-    padding: 1rem;
+    display: flex;
+    flex-direction: column;
 }
 
-.sidebar-section h4 {
+.sidebar-section:not(.collapsed) {
+    flex: 1;
+}
+
+.sidebar-section.collapsed {
+    flex: 0 0 auto;
+}
+
+.section-header {
+    display: flex;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    background-color: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.section-header:hover {
+    background-color: var(--bg-hover);
+}
+
+.section-toggle {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 0.25rem;
+    margin-right: 0.5rem;
+    border-radius: 2px;
+    transition: all 0.2s ease;
+    font-size: 0.8rem;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.section-toggle:hover {
+    background-color: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+.toggle-icon {
+    transition: transform 0.2s ease;
+    display: inline-block;
+}
+
+.section-toggle[aria-expanded="false"] .toggle-icon {
+    transform: rotate(-90deg);
+}
+
+.section-header h4 {
     font-size: 0.9rem;
     font-weight: 600;
-    margin-bottom: 1rem;
+    margin: 0;
     color: var(--text-primary);
+    flex: 1;
+}
+
+.section-content {
+    padding: 1rem;
+    transition: all 0.3s ease;
+    overflow: hidden;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.section-content.collapsed {
+    padding-top: 0;
+    padding-bottom: 0;
+    max-height: 0;
+    opacity: 0;
+    flex: 0;
+}
+
+/* Make containers within sections fill available space */
+.qa-container,
+.highlights-container,
+.notes-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.qa-history {
+    flex: 1;
+    overflow-y: auto;
+}
+
+.highlights-container,
+.notes-container {
+    overflow-y: auto;
+}
+
+/* Ensure input elements are always clickable and focusable */
+#questionInput,
+#noteTextarea,
+#apiKey,
+input,
+textarea {
+    pointer-events: auto !important;
+    user-select: text !important;
+    -webkit-user-select: text !important;
+    -moz-user-select: text !important;
+    -ms-user-select: text !important;
+}
+
+/* Prevent section headers from interfering with inputs */
+.section-header {
+    pointer-events: auto;
+}
+
+.section-header * {
+    pointer-events: none;
+}
+
+.section-header .section-toggle {
+    pointer-events: auto;
+}
+
+/* Ensure input containers don't interfere */
+.question-input,
+.modal-body {
+    pointer-events: auto;
+}
+
+.question-input *,
+.modal-body * {
+    pointer-events: auto;
 }
 
 .no-content-message,
@@ -536,6 +667,20 @@ body {
     background-color: var(--bg-primary);
     color: var(--text-primary);
     font-family: inherit;
+}
+
+.setting-group input[readonly] {
+    background-color: var(--bg-secondary);
+    color: var(--text-secondary);
+    cursor: not-allowed;
+}
+
+.setting-note {
+    display: block;
+    margin-top: 0.25rem;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    font-style: italic;
 }
 
 .selected-text {

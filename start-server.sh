@@ -11,7 +11,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-PORT=8080
+PORT=8081
 HOST="localhost"
 
 echo -e "${BLUE}🚀 Starting VibeReader Development Server${NC}"
