@@ -11,6 +11,7 @@ class SidebarManager {
         this.setupEventListeners();
         this.initializeModalManager();
         this.loadTextSize();
+        // this.hideTOCButton(); // Hide TOC button initially - TEMPORARILY DISABLED FOR TESTING
     }
 
     initializeModalManager() {
@@ -26,7 +27,7 @@ class SidebarManager {
             });
         }
 
-        // TOC toggle functionality
+        // TOC toggle functionality - single arrow button in navbar
         const tocToggle = document.getElementById('tocToggle');
         if (tocToggle) {
             tocToggle.addEventListener('click', () => {
@@ -62,6 +63,17 @@ class SidebarManager {
         document.getElementById('closeNoteModal').addEventListener('click', () => {
             this.closeNoteModal();
         });
+
+        // Note textarea input validation
+        const noteTextareaInput = document.getElementById('noteTextarea');
+        const saveNoteBtn = document.getElementById('saveNote');
+        if (noteTextareaInput && saveNoteBtn) {
+            noteTextareaInput.addEventListener('input', () => {
+                const hasText = noteTextareaInput.value.trim().length > 0;
+                saveNoteBtn.disabled = !hasText;
+                saveNoteBtn.classList.toggle('disabled', !hasText);
+            });
+        }
 
         // Settings modal events
         document.getElementById('settingsBtn').addEventListener('click', () => {
@@ -114,8 +126,10 @@ class SidebarManager {
             apiKeyInput.focus();
         });
         
-        // Don't load saved states on initialization - sidebars start hidden
-        // States will be loaded when a book is loaded via expandSidebarsForBook()
+        // Load saved smart bar state
+        this.loadSmartBarState();
+        // Load saved TOC state
+        this.loadTOCState();
     }
 
     toggleSmartBar() {
@@ -141,50 +155,17 @@ class SidebarManager {
     toggleTOC() {
         const leftPanel = document.getElementById('leftPanel');
         const tocToggle = document.getElementById('tocToggle');
-        const readingContainer = document.getElementById('readingContainer');
-        
-        // Preserve scroll position more robustly
-        let scrollTop = 0;
-        let scrollElement = null;
-        
-        // Try multiple scroll containers to find the right one
-        if (readingContainer && readingContainer.scrollTop > 0) {
-            scrollElement = readingContainer;
-            scrollTop = readingContainer.scrollTop;
-        } else if (document.documentElement.scrollTop > 0) {
-            scrollElement = document.documentElement;
-            scrollTop = document.documentElement.scrollTop;
-        } else if (document.body.scrollTop > 0) {
-            scrollElement = document.body;
-            scrollTop = document.body.scrollTop;
-        }
         
         this.isTOCCollapsed = !this.isTOCCollapsed;
         
         if (this.isTOCCollapsed) {
             leftPanel.classList.add('collapsed');
-            tocToggle.textContent = '📖';
+            tocToggle.textContent = '▶'; // Right arrow
             tocToggle.title = 'Show Table of Contents';
         } else {
             leftPanel.classList.remove('collapsed');
-            tocToggle.textContent = '📑';
+            tocToggle.textContent = '◀'; // Left arrow
             tocToggle.title = 'Hide Table of Contents';
-        }
-        
-        // Restore scroll position with multiple attempts
-        if (scrollElement && scrollTop > 0) {
-            // Immediate restore
-            scrollElement.scrollTop = scrollTop;
-            
-            // Backup restore after DOM update
-            requestAnimationFrame(() => {
-                scrollElement.scrollTop = scrollTop;
-                
-                // Final backup restore
-                setTimeout(() => {
-                    scrollElement.scrollTop = scrollTop;
-                }, 10);
-            });
         }
         
         // Save state
@@ -200,38 +181,39 @@ class SidebarManager {
     }
 
     loadTOCState() {
-        const saved = localStorage.getItem('vibeReader_tocCollapsed');
-        if (saved === 'true') {
-            this.isTOCCollapsed = true;
-            this.toggleTOC();
+        // TOC should always start collapsed and hidden initially
+        // Only show when a book is loaded via expandSidebarsForBook()
+        this.isTOCCollapsed = true;
+        const leftPanel = document.getElementById('leftPanel');
+        if (leftPanel) {
+            leftPanel.classList.add('collapsed');
         }
     }
 
-    expandSidebarsForBook() {
-        // When a book is loaded, load saved states or expand both sidebars by default
-        
-        // Load saved TOC state, or expand if no saved state
-        const savedTOC = localStorage.getItem('vibeReader_tocCollapsed');
-        if (savedTOC === 'true') {
-            // User previously collapsed TOC, keep it collapsed
-            this.isTOCCollapsed = true;
-        } else {
-            // Expand TOC (default behavior when book loads)
-            if (this.isTOCCollapsed) {
-                this.toggleTOC();
-            }
+    hideTOCButton() {
+        const tocToggle = document.getElementById('tocToggle');
+        if (tocToggle) {
+            tocToggle.style.display = 'none';
         }
+    }
+    
+    showTOCButton() {
+        const tocToggle = document.getElementById('tocToggle');
+        if (tocToggle) {
+            tocToggle.style.display = 'inline-flex';
+        }
+    }
+    
+    expandSidebarsForBook() {
+        // Show TOC button and expand both sidebars when a book is loaded
+        this.showTOCButton();
         
-        // Load saved Smart Bar state, or expand if no saved state
-        const savedSmartBar = localStorage.getItem('vibeReader_smartBarCollapsed');
-        if (savedSmartBar === 'true') {
-            // User previously collapsed Smart Bar, keep it collapsed
-            this.isCollapsed = true;
-        } else {
-            // Expand Smart Bar (default behavior when book loads)
-            if (this.isCollapsed) {
-                this.toggleSmartBar();
-            }
+        // Expand both sidebars when a book is loaded (if they're currently collapsed)
+        if (this.isTOCCollapsed) {
+            this.toggleTOC();
+        }
+        if (this.isCollapsed) {
+            this.toggleSmartBar();
         }
     }
 
@@ -940,8 +922,8 @@ class SidebarManager {
         const noteTextarea = document.getElementById('noteTextarea');
         const noteText = noteTextarea.value.trim();
 
+        // Button should be disabled if no text, but check as safety measure
         if (!noteText) {
-            this.showError('Please enter a note');
             return;
         }
 

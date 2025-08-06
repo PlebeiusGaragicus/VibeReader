@@ -29,12 +29,30 @@ body {
     border-bottom: 1px solid var(--border-color);
     height: 70px;
     flex-shrink: 0;
+    position: relative;
+    z-index: 1000; /* Above TOC overlay */
 }
 
 .app-title {
     font-size: 1.5rem;
     font-weight: 600;
     color: var(--accent-color);
+}
+
+.header-left,
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 120px;
+}
+
+.header-left {
+    justify-content: flex-start;
+}
+
+.header-right {
+    justify-content: flex-end;
 }
 
 .header-center {
@@ -88,10 +106,17 @@ body {
     padding: 0.5rem;
     border-radius: 4px;
     transition: background-color 0.2s ease;
+    color: var(--text-primary);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 40px;
+    min-height: 40px;
 }
 
 .icon-btn:hover {
     background-color: var(--bg-hover);
+    color: var(--accent-color);
 }
 
 /* Main Content Layout */
@@ -102,14 +127,32 @@ body {
 }
 
 /* Panel Styles */
-.left-panel,
-.right-panel {
+.left-panel {
     width: 300px;
     background-color: var(--bg-secondary);
     border-right: 1px solid var(--border-color);
+    position: fixed;
+    top: 60px; /* Below navbar */
+    left: 0;
+    bottom: 0;
+    z-index: 500; /* Lower than navbar */
+    opacity: 0.9;
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+    display: none; /* Hidden initially */
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.right-panel {
+    width: 300px;
+    background-color: var(--bg-secondary);
+    border-right: none;
+    border-left: 1px solid var(--border-color);
     display: none;  /* Default to collapsed */
     flex-direction: column;
     overflow: hidden;
+    transition: width 0.3s ease;
 }
 
 .right-panel {
@@ -122,6 +165,7 @@ body {
 
 .left-panel:not(.collapsed) {
     display: flex;
+    transform: translateX(0);
 }
 
 .right-panel:not(.collapsed) {
@@ -293,7 +337,7 @@ body {
 .panel-header {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: center;
     padding: 1rem;
     border-bottom: 1px solid var(--border-color);
     background-color: var(--bg-tertiary);
@@ -332,6 +376,7 @@ body {
     padding: 2rem;
     line-height: 1.6;
     font-size: 1.1rem;
+    background-color: #000000;
 }
 
 /* Enhanced paragraph and text spacing for better readability */
@@ -502,6 +547,8 @@ body {
     color: var(--text-primary);
     font-weight: normal;
 }
+
+
 
 /* Studio Credit - Bottom of Screen */
 .studio-credit-bottom {
@@ -1066,6 +1113,19 @@ textarea {
 
 .btn-primary:hover {
     background-color: var(--accent-hover);
+}
+
+.btn-primary:disabled,
+.btn-primary.disabled {
+    background-color: var(--text-secondary);
+    color: var(--text-muted);
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.btn-primary:disabled:hover,
+.btn-primary.disabled:hover {
+    background-color: var(--text-secondary);
 }
 
 .btn-secondary {

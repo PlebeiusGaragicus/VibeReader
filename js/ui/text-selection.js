@@ -457,6 +457,13 @@ class TextSelectionHandler {
             noteTextarea.focus();
         }
 
+        // Disable save button initially since textarea is empty
+        const saveNoteBtn = document.getElementById('saveNote');
+        if (saveNoteBtn) {
+            saveNoteBtn.disabled = true;
+            saveNoteBtn.classList.add('disabled');
+        }
+
         if (noteModal) {
             noteModal.classList.remove('hidden');
         }
