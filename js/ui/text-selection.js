@@ -272,34 +272,62 @@ class TextSelectionHandler {
             bubble.style.top = `${top}px`;
         }
 
+        // Set up event listeners FIRST (before showing bubble and focusing)
+        this.setupBubbleEventListeners();
+        
         // Show bubble
         bubble.classList.remove('hidden');
         
-        // Set up simple button event listeners
-        this.setupBubbleEventListeners();
-        
-        // Simple focus - no cloning, no complex handling
+        // Focus the input after event listeners are set up and bubble is shown
         setTimeout(() => {
-            if (questionInput) {
-                questionInput.value = ''; // Clear any existing text
-                questionInput.focus();
+            const freshQuestionInput = document.getElementById('bubbleQuestionInput');
+            if (freshQuestionInput) {
+                freshQuestionInput.value = ''; // Clear any existing text
+                freshQuestionInput.focus();
+                // Set cursor at end of input
+                freshQuestionInput.setSelectionRange(0, 0);
             }
-        }, 100);
+        }, 150);
     }
 
     setupBubbleEventListeners() {
-        // ULTRA SIMPLE: Just button clicks, no keyboard shortcuts, no complex focus handling
         const askBtn = document.getElementById('bubbleAskBtn');
         const cancelBtn = document.getElementById('bubbleCancelBtn');
+        const questionInput = document.getElementById('bubbleQuestionInput');
 
-        if (!askBtn || !cancelBtn) return;
+        if (!askBtn || !cancelBtn || !questionInput) return;
 
-        // Simple button event listeners - no input event listeners at all
+        // Button event listeners
         askBtn.onclick = () => this.handleBubbleAsk();
         cancelBtn.onclick = () => this.hideBubble();
+
+        // Handle Enter key to submit question - MUST be added BEFORE event blocking
+        questionInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                this.handleBubbleAsk();
+                return;
+            }
+            // Allow other keydown events to bubble for normal typing
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+        });
+
+        // Fix focus persistence for question input - exclude keydown to allow Enter handling
+        // Prevent event bubbling for mouse and focus events only
+        ['mousedown', 'mouseup', 'click', 'focus', 'blur', 'keyup', 'keypress'].forEach(eventType => {
+            questionInput.addEventListener(eventType, (e) => {
+                e.stopPropagation();
+                e.stopImmediatePropagation();
+            });
+        });
+        
+        // Ensure input stays focusable when clicked
+        questionInput.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            questionInput.focus();
+        });
     }
-
-
 
     async handleBubbleAsk() {
         const questionInput = document.getElementById('bubbleQuestionInput');
