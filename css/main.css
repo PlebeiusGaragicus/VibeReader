@@ -402,7 +402,8 @@ body {
     padding: 2rem;
     line-height: 1.6;
     font-size: 1.1rem;
-    background-color: #000000;
+    background-color: var(--reading-bg);
+    color: var(--reading-text);
 }
 
 /* Enhanced paragraph and text spacing for better readability */
@@ -1149,6 +1150,48 @@ textarea {
     opacity: 0.6;
 }
 
+/* Endnote Modal Styles */
+.endnote-modal-content {
+    max-width: 600px;
+    width: 90%;
+}
+
+.endnote-content {
+    line-height: 1.6;
+    font-size: 1rem;
+    color: var(--text-primary);
+}
+
+.endnote-content p {
+    margin-bottom: 1rem;
+}
+
+.endnote-content:last-child {
+    margin-bottom: 0;
+}
+
+/* Endnote Reference Styling */
+.endnote-ref {
+    color: var(--accent-color);
+    text-decoration: none;
+    cursor: pointer;
+    padding: 0 2px;
+    border-radius: 2px;
+    transition: background-color 0.2s ease;
+    font-weight: 500;
+}
+
+.endnote-ref:hover {
+    background-color: var(--accent-color);
+    color: white;
+    text-decoration: none;
+}
+
+.endnote-ref sup {
+    font-size: 0.8em;
+    vertical-align: super;
+}
+
 .btn-primary:disabled:hover,
 .btn-primary.disabled:hover {
     background-color: var(--text-secondary);
@@ -1419,6 +1462,7 @@ textarea {
 
 .text-highlight {
     background-color: var(--highlight-bg);
+    color: inherit;
     padding: 0.1rem 0.2rem;
     border-radius: 2px;
 }

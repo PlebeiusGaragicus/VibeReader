@@ -344,6 +344,11 @@ class EPUBParser {
         
         // Wait for all image processing to complete
         await Promise.all(imagePromises);
+        
+        // Process endnotes if EndnoteHandler is available
+        if (window.EndnoteHandler && window.app && window.app.endnoteHandler) {
+            window.app.endnoteHandler.processEndnotes(doc.body || doc);
+        }
     }
 
     extractTitle(doc) {

@@ -114,7 +114,12 @@ class TextSelectionHandler {
     }
 
     highlightSelectedText() {
-        if (!this.selectedText || !this.selectedRange) return;
+        if (!this.selectedText || !this.selectedRange) {
+            console.warn('No text selected for highlighting');
+            return;
+        }
+
+        console.log('Highlighting text:', this.selectedText);
 
         try {
             // Create highlight data
@@ -125,6 +130,8 @@ class TextSelectionHandler {
                 chapter: this.getCurrentChapter(),
                 color: 'yellow' // Default color
             };
+
+            console.log('Created highlight object:', highlight);
 
             // Apply highlight to DOM
             this.applyHighlight(highlight);
@@ -138,39 +145,239 @@ class TextSelectionHandler {
 
                 // Update sidebar
                 this.app.sidebar.displayHighlights(highlights);
+                console.log('Highlight saved and sidebar updated');
             }
 
             this.hideSelectionMenu();
             
         } catch (error) {
             console.error('Failed to create highlight:', error);
-            this.app.showError('Failed to create highlight');
+            if (this.app.showError) {
+                this.app.showError('Failed to create highlight: ' + error.message);
+            } else {
+                alert('Failed to create highlight: ' + error.message);
+            }
         }
     }
 
     applyHighlight(highlight) {
-        if (!this.selectedRange) return;
+        if (!this.selectedRange) {
+            console.error('No selected range for highlighting');
+            return;
+        }
+
+        console.log('Applying highlight:', highlight.id, 'to text:', highlight.text);
 
         try {
-            // Create highlight span
-            const highlightSpan = document.createElement('span');
-            highlightSpan.className = 'text-highlight';
-            highlightSpan.setAttribute('data-highlight-id', highlight.id);
-            highlightSpan.setAttribute('title', `Highlighted on ${new Date(highlight.timestamp).toLocaleDateString()}`);
+            // Check if the range can be safely wrapped with surroundContents
+            const canUseSurround = this.canUseSurroundContents(this.selectedRange);
+            console.log('Can use surroundContents:', canUseSurround);
+            
+            if (canUseSurround) {
+                console.log('Using surroundContents method');
+                // Create highlight span
+                const highlightSpan = document.createElement('span');
+                highlightSpan.className = 'text-highlight';
+                highlightSpan.setAttribute('data-highlight-id', highlight.id);
+                highlightSpan.setAttribute('title', `Highlighted on ${new Date(highlight.timestamp).toLocaleDateString()}`);
 
-            // Wrap the selected content
-            this.selectedRange.surroundContents(highlightSpan);
+                // Wrap the selected content
+                this.selectedRange.surroundContents(highlightSpan);
+                console.log('Successfully applied highlight with surroundContents');
+                console.log('Highlight span content:', highlightSpan.textContent);
+                console.log('Highlight span HTML:', highlightSpan.outerHTML);
+            } else {
+                console.log('Using marker-based highlighting for complex selection');
+                // Use marker-based approach for complex selections
+                this.applyMarkerBasedHighlight(highlight);
+            }
             
         } catch (error) {
-            // Fallback: try to highlight by replacing text
-            console.warn('Failed to apply highlight with surroundContents, trying fallback:', error);
-            this.applyHighlightFallback(highlight);
+            // Fallback: try marker-based highlighting
+            console.warn('Failed to apply highlight with surroundContents, trying marker-based approach:', error);
+            this.applyMarkerBasedHighlight(highlight);
         }
     }
 
-    applyHighlightFallback(highlight) {
-        // This is a simplified fallback - in a production app you'd want more robust highlighting
+    canUseSurroundContents(range) {
+        try {
+            // Check if the range is collapsed
+            if (range.collapsed) return false;
+            
+            // Check if the range partially selects any non-text nodes
+            const startContainer = range.startContainer;
+            const endContainer = range.endContainer;
+            
+            // If start and end are in different elements, it might be complex
+            if (startContainer !== endContainer) {
+                // Check if they share a common parent that's not too far up
+                const commonAncestor = range.commonAncestorContainer;
+                
+                // If the common ancestor is the document or body, it's too complex
+                if (commonAncestor === document || commonAncestor === document.body) {
+                    return false;
+                }
+                
+                // Check if the selection crosses element boundaries in a problematic way
+                const walker = document.createTreeWalker(
+                    commonAncestor,
+                    NodeFilter.SHOW_ELEMENT,
+                    null,
+                    false
+                );
+                
+                let node;
+                while (node = walker.nextNode()) {
+                    // If the range intersects with an element boundary, it might be problematic
+                    if (range.intersectsNode(node) && !range.selectNode) {
+                        // Check if this is an inline element that's safe to cross
+                        const tagName = node.tagName.toLowerCase();
+                        const safeInlineTags = ['span', 'em', 'strong', 'i', 'b', 'u', 'small', 'mark'];
+                        
+                        if (!safeInlineTags.includes(tagName)) {
+                            return false;
+                        }
+                    }
+                }
+            }
+            
+            // Additional check: try to clone the range to see if it's valid
+            const testRange = range.cloneRange();
+            
+            // Test if we can clone contents without error (non-destructive)
+            try {
+                const clonedContents = testRange.cloneContents();
+                return clonedContents !== null;
+            } catch (error) {
+                return false;
+            }
+            
+        } catch (error) {
+            // If any error occurs during validation, it's not safe
+            return false;
+        }
+    }
+
+    applyMarkerBasedHighlight(highlight) {
+        console.log('Applying marker-based highlight for text:', this.selectedText);
+        
         const readingContainer = document.getElementById('readingContainer');
+        if (!readingContainer) {
+            console.error('Reading container not found');
+            return;
+        }
+        
+        if (!this.selectedRange || this.selectedRange.collapsed) {
+            console.error('No valid selection range');
+            return;
+        }
+        
+        try {
+            // Insert invisible start and end markers
+            const startMarker = document.createElement('span');
+            startMarker.className = 'highlight-start-marker';
+            startMarker.setAttribute('data-highlight-id', highlight.id);
+            startMarker.style.display = 'none';
+            
+            const endMarker = document.createElement('span');
+            endMarker.className = 'highlight-end-marker';
+            endMarker.setAttribute('data-highlight-id', highlight.id);
+            endMarker.style.display = 'none';
+            
+            // Clone the range to avoid modifying the original
+            const range = this.selectedRange.cloneRange();
+            
+            // Insert markers at start and end of selection
+            range.collapse(false); // Collapse to end
+            range.insertNode(endMarker);
+            
+            range.setStart(this.selectedRange.startContainer, this.selectedRange.startOffset);
+            range.collapse(true); // Collapse to start
+            range.insertNode(startMarker);
+            
+            // Now apply highlighting between the markers
+            this.highlightBetweenMarkers(highlight.id, highlight);
+            
+            console.log('Successfully applied marker-based highlight');
+            
+        } catch (error) {
+            console.error('Marker-based highlighting failed:', error);
+            // Final fallback to simple text search
+            this.applySimpleTextHighlight(highlight);
+        }
+    }
+    
+    highlightBetweenMarkers(highlightId, highlight) {
+        console.log('Highlighting content between markers for ID:', highlightId);
+        
+        const startMarker = document.querySelector(`.highlight-start-marker[data-highlight-id="${highlightId}"]`);
+        const endMarker = document.querySelector(`.highlight-end-marker[data-highlight-id="${highlightId}"]`);
+        
+        if (!startMarker || !endMarker) {
+            console.error('Could not find start or end markers');
+            return;
+        }
+        
+        // Create a range from start marker to end marker
+        const range = document.createRange();
+        range.setStartAfter(startMarker);
+        range.setEndBefore(endMarker);
+        
+        // Walk through all text nodes between the markers
+        const walker = document.createTreeWalker(
+            range.commonAncestorContainer,
+            NodeFilter.SHOW_TEXT,
+            {
+                acceptNode: function(node) {
+                    return range.intersectsNode(node) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+                }
+            },
+            false
+        );
+        
+        const textNodesToHighlight = [];
+        let node;
+        while (node = walker.nextNode()) {
+            // Only include text nodes that are actually between our markers
+            const nodeRange = document.createRange();
+            nodeRange.selectNodeContents(node);
+            
+            if (range.compareBoundaryPoints(Range.START_TO_END, nodeRange) > 0 && 
+                range.compareBoundaryPoints(Range.END_TO_START, nodeRange) < 0) {
+                textNodesToHighlight.push(node);
+            }
+        }
+        
+        console.log('Found', textNodesToHighlight.length, 'text nodes to highlight between markers');
+        
+        // Highlight each text node
+        textNodesToHighlight.forEach((textNode, index) => {
+            const parent = textNode.parentNode;
+            const highlightSpan = document.createElement('span');
+            highlightSpan.className = 'text-highlight';
+            highlightSpan.setAttribute('data-highlight-id', highlightId);
+            highlightSpan.setAttribute('data-highlight-part', index + 1);
+            highlightSpan.setAttribute('title', `Highlighted on ${new Date(highlight.timestamp).toLocaleDateString()}`);
+            
+            // Clone the text node and wrap it
+            highlightSpan.appendChild(textNode.cloneNode(true));
+            parent.replaceChild(highlightSpan, textNode);
+        });
+        
+        console.log('Applied highlighting to', textNodesToHighlight.length, 'text nodes');
+    }
+    
+    applySimpleTextHighlight(highlight) {
+        console.log('Applying simple text highlight fallback');
+        
+        const readingContainer = document.getElementById('readingContainer');
+        if (!readingContainer) {
+            console.error('Reading container not found');
+            return;
+        }
+        
+        // Simple approach: find the first occurrence of the text and highlight it
+        const searchText = this.selectedText.trim();
         const walker = document.createTreeWalker(
             readingContainer,
             NodeFilter.SHOW_TEXT,
@@ -178,40 +385,37 @@ class TextSelectionHandler {
             false
         );
 
-        const textNodes = [];
         let node;
         while (node = walker.nextNode()) {
-            textNodes.push(node);
-        }
-
-        for (const textNode of textNodes) {
-            if (textNode.textContent.includes(this.selectedText)) {
-                const parent = textNode.parentNode;
-                const text = textNode.textContent;
-                const index = text.indexOf(this.selectedText);
+            const nodeText = node.textContent;
+            if (nodeText.includes(searchText)) {
+                const index = nodeText.indexOf(searchText);
+                const parent = node.parentNode;
                 
-                if (index !== -1) {
-                    const before = text.substring(0, index);
-                    const highlighted = text.substring(index, index + this.selectedText.length);
-                    const after = text.substring(index + this.selectedText.length);
+                const before = nodeText.substring(0, index);
+                const highlighted = nodeText.substring(index, index + searchText.length);
+                const after = nodeText.substring(index + searchText.length);
 
-                    const fragment = document.createDocumentFragment();
-                    
-                    if (before) fragment.appendChild(document.createTextNode(before));
-                    
-                    const highlightSpan = document.createElement('span');
-                    highlightSpan.className = 'text-highlight';
-                    highlightSpan.setAttribute('data-highlight-id', highlight.id);
-                    highlightSpan.textContent = highlighted;
-                    fragment.appendChild(highlightSpan);
-                    
-                    if (after) fragment.appendChild(document.createTextNode(after));
+                const fragment = document.createDocumentFragment();
+                
+                if (before) fragment.appendChild(document.createTextNode(before));
+                
+                const highlightSpan = document.createElement('span');
+                highlightSpan.className = 'text-highlight';
+                highlightSpan.setAttribute('data-highlight-id', highlight.id);
+                highlightSpan.setAttribute('title', `Highlighted on ${new Date(highlight.timestamp).toLocaleDateString()}`);
+                highlightSpan.textContent = highlighted;
+                fragment.appendChild(highlightSpan);
+                
+                if (after) fragment.appendChild(document.createTextNode(after));
 
-                    parent.replaceChild(fragment, textNode);
-                    break;
-                }
+                parent.replaceChild(fragment, node);
+                console.log('Applied simple text highlight');
+                return;
             }
         }
+        
+        console.warn('Could not find text to highlight with simple approach');
     }
 
     askAIAboutSelection() {
@@ -492,16 +696,49 @@ class TextSelectionHandler {
     }
 
     removeHighlight(highlightId) {
-        const highlightElement = document.querySelector(`[data-highlight-id="${highlightId}"]`);
-        if (highlightElement) {
-            // Replace highlight span with its text content
-            const parent = highlightElement.parentNode;
-            const textNode = document.createTextNode(highlightElement.textContent);
-            parent.replaceChild(textNode, highlightElement);
-            
-            // Normalize the parent to merge adjacent text nodes
-            parent.normalize();
+        console.log('Removing highlight:', highlightId);
+        
+        // Find ALL elements related to this highlight (spans and markers)
+        const highlightElements = document.querySelectorAll(`[data-highlight-id="${highlightId}"]`);
+        console.log('Found', highlightElements.length, 'elements to remove (spans + markers)');
+        
+        if (highlightElements.length === 0) {
+            console.warn('No highlight elements found for ID:', highlightId);
+            return;
         }
+        
+        // Keep track of parents that need normalization
+        const parentsToNormalize = new Set();
+        
+        // Remove each element (highlight spans and markers)
+        highlightElements.forEach((element, index) => {
+            console.log(`Removing element ${index + 1}/${highlightElements.length}: ${element.className}`);
+            
+            const parent = element.parentNode;
+            if (parent) {
+                // If it's a highlight span, replace with text content
+                if (element.classList.contains('text-highlight')) {
+                    const textNode = document.createTextNode(element.textContent);
+                    parent.replaceChild(textNode, element);
+                    parentsToNormalize.add(parent);
+                } else {
+                    // If it's a marker, just remove it
+                    parent.removeChild(element);
+                }
+            }
+        });
+        
+        // Normalize all affected parents to merge adjacent text nodes
+        // This helps restore the original text structure
+        parentsToNormalize.forEach(parent => {
+            try {
+                parent.normalize();
+            } catch (error) {
+                console.warn('Failed to normalize parent:', error);
+            }
+        });
+        
+        console.log('Successfully removed all elements for highlight ID:', highlightId);
 
         // Remove from storage
         const bookId = this.app.fileHandler.getCurrentBook()?.id;
@@ -512,6 +749,7 @@ class TextSelectionHandler {
             
             // Update sidebar
             this.app.sidebar.displayHighlights(updatedHighlights);
+            console.log('Updated storage and sidebar');
         }
     }
 
