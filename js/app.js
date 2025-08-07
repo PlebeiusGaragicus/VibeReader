@@ -9,6 +9,7 @@ class VibeReaderApp {
         this.aiIntegration = null;
         this.themeManager = null;
         this.scrollManager = null;
+        this.endnoteHandler = null;
         
         this.init();
     }
@@ -29,6 +30,7 @@ class VibeReaderApp {
             this.sidebar = new SidebarManager(this);
             this.fileHandler = new FileHandler(this);
             this.textSelection = new TextSelectionHandler(this);
+            this.endnoteHandler = new EndnoteHandler(this);
             
             // Setup global event listeners
             this.setupGlobalEventListeners();

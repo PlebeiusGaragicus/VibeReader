@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VibeReader (build: 1234)</title> <!-- UPDATE THIS! -->
+    <title>VibeReader (build: 1236)</title> <!-- UPDATE THIS! -->
     <link rel="stylesheet" href="css/main.css">
     <link rel="stylesheet" href="css/themes/default.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script>
@@ -182,6 +182,22 @@
             </div>
         </div>
 
+        <!-- Endnote Modal -->
+        <div id="endnoteModal" class="modal hidden">
+            <div class="modal-content endnote-modal-content">
+                <div class="modal-header">
+                    <h3 id="endnoteTitle">📝 Endnote</h3>
+                    <button id="closeEndnoteModal" class="close-btn">×</button>
+                </div>
+                <div class="modal-body">
+                    <div id="endnoteContent" class="endnote-content"></div>
+                </div>
+                <div class="modal-footer">
+                    <button id="closeEndnoteBtn" class="btn-primary">Close</button>
+                </div>
+            </div>
+        </div>
+
         <!-- Loading Overlay -->
         <div id="loadingOverlay" class="loading-overlay hidden">
             <div class="loading-content">
@@ -202,6 +218,7 @@
     <script src="js/ui/file-handler.js"></script>
     <script src="js/ui/text-selection.js"></script>
     <script src="js/ui/sidebar.js"></script>
+    <script src="js/ui/endnote-handler.js"></script>
     <script src="js/ai/ai-integration.js"></script>
     <script src="js/app.js"></script>
 </body>

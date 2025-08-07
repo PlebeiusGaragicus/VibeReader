@@ -373,10 +373,32 @@ class SidebarManager {
     }
 
     findTextInContent(text, container) {
-        // More sophisticated text search that looks for exact matches
+        // More sophisticated text search that handles complex HTML structures like endnotes
         if (!text || text.length < 3) return null;
         
-        // First try to find exact match
+        // Strategy 0: First try to find existing highlight spans with this text
+        // This is especially useful for multi-paragraph highlights
+        const highlightSpans = container.querySelectorAll('.text-highlight');
+        for (const span of highlightSpans) {
+            const spanText = span.textContent.replace(/\s+/g, ' ').trim();
+            if (spanText === text.replace(/\s+/g, ' ').trim()) {
+                console.log('Found exact highlight span match');
+                return span;
+            }
+            // For long text, check if this span contains the beginning of our search text
+            if (text.length > 50) {
+                const searchStart = text.substring(0, 50).replace(/\s+/g, ' ').trim();
+                if (spanText.includes(searchStart)) {
+                    console.log('Found partial highlight span match');
+                    return span;
+                }
+            }
+        }
+        
+        // Clean the search text by removing extra whitespace and normalizing
+        const cleanSearchText = text.replace(/\s+/g, ' ').trim();
+        
+        // Strategy 1: Try to find exact match in text content
         const walker = document.createTreeWalker(
             container,
             NodeFilter.SHOW_TEXT,
@@ -389,20 +411,79 @@ class SidebarManager {
         let node;
         
         while (node = walker.nextNode()) {
-            const nodeText = node.textContent;
+            const nodeText = node.textContent.replace(/\s+/g, ' ').trim();
             
             // Check for exact match first
-            if (nodeText.includes(text)) {
+            if (nodeText.includes(cleanSearchText)) {
                 return node.parentElement;
             }
             
             // Check for partial match (for longer text that might be split)
-            const searchText = text.substring(0, Math.min(text.length, 100));
+            const searchText = cleanSearchText.substring(0, Math.min(cleanSearchText.length, 100));
             if (nodeText.includes(searchText)) {
                 const score = searchText.length;
                 if (score > bestMatchScore) {
                     bestMatch = node.parentElement;
                     bestMatchScore = score;
+                }
+            }
+        }
+        
+        // Strategy 2: If no match found, try searching within paragraph elements
+        // This handles cases where text spans multiple elements (like endnotes)
+        if (!bestMatch) {
+            const paragraphs = container.querySelectorAll('p, div, section');
+            
+            for (const paragraph of paragraphs) {
+                const paragraphText = paragraph.textContent.replace(/\s+/g, ' ').trim();
+                
+                // Check if the paragraph contains our search text
+                if (paragraphText.includes(cleanSearchText)) {
+                    return paragraph;
+                }
+                
+                // For longer texts, check if paragraph contains a significant portion
+                if (cleanSearchText.length > 50) {
+                    const searchStart = cleanSearchText.substring(0, 50);
+                    const searchEnd = cleanSearchText.substring(cleanSearchText.length - 50);
+                    
+                    if (paragraphText.includes(searchStart) || paragraphText.includes(searchEnd)) {
+                        if (!bestMatch) {
+                            bestMatch = paragraph;
+                            bestMatchScore = 25; // Lower score for partial match
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Strategy 3: Try fuzzy matching for cases where endnotes might have altered the text
+        if (!bestMatch && cleanSearchText.length > 20) {
+            const searchWords = cleanSearchText.split(' ').filter(word => word.length > 3);
+            
+            if (searchWords.length >= 3) {
+                const allElements = container.querySelectorAll('p, div, section, span');
+                
+                for (const element of allElements) {
+                    const elementText = element.textContent.replace(/\s+/g, ' ').trim();
+                    let matchCount = 0;
+                    
+                    // Count how many significant words match
+                    for (const word of searchWords) {
+                        if (elementText.toLowerCase().includes(word.toLowerCase())) {
+                            matchCount++;
+                        }
+                    }
+                    
+                    // If most words match, consider this a good candidate
+                    const matchRatio = matchCount / searchWords.length;
+                    if (matchRatio >= 0.6) { // At least 60% of words must match
+                        const score = matchCount * 10;
+                        if (score > bestMatchScore) {
+                            bestMatch = element;
+                            bestMatchScore = score;
+                        }
+                    }
                 }
             }
         }
