@@ -12,11 +12,31 @@ class StorageManager {
 
     getSettings() {
         const settings = localStorage.getItem(this.prefix + 'settings');
-        return settings ? JSON.parse(settings) : {
+        const defaultSettings = {
             apiEndpoint: 'https://webui.plebchat.me/ollama/v1',
-            apiKey: '',
+            apiKey: this.getApiKeyFromCookie(), // Always get API key from cookie
             aiModel: 'gemma3:27b-it-q8_0'
         };
+        
+        if (settings) {
+            const parsedSettings = JSON.parse(settings);
+            // Always override apiKey with cookie value, never use localStorage
+            parsedSettings.apiKey = this.getApiKeyFromCookie();
+            return { ...defaultSettings, ...parsedSettings };
+        }
+        
+        return defaultSettings;
+    }
+    
+    getApiKeyFromCookie() {
+        const cookies = document.cookie.split(';');
+        for (let cookie of cookies) {
+            const [name, value] = cookie.trim().split('=');
+            if (name === 'vibeReader_apiKey') {
+                return decodeURIComponent(value);
+            }
+        }
+        return '';
     }
 
     // Book Data

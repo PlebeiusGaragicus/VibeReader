@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VibeReader - Modern Ebook Reader</title>
+    <title>VibeReader (build: 1234)</title> <!-- UPDATE THIS! -->
     <link rel="stylesheet" href="css/main.css">
     <link rel="stylesheet" href="css/themes/default.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script>
@@ -13,7 +13,10 @@
         <!-- Header -->
         <header class="app-header">
             <div class="header-left">
-                <button id="tocToggle" class="icon-btn" title="Show Table of Contents">▶</button>
+                <button id="tocToggle" class="toc-toggle-btn hidden" title="Show Table of Contents">
+                    <span class="toc-text">Table of Contents</span>
+                    <span class="toc-arrow">▶</span>
+                </button>
             </div>
             <div class="header-center">
                 <h1 class="app-title">VibeReader</h1>
@@ -23,6 +26,7 @@
                 <button id="increaseTextBtn" class="icon-btn" title="Increase Text Size">➕</button>
                 <button id="themeToggleBtn" class="icon-btn" title="Toggle Theme">🌙</button>
                 <button id="smartBarToggle" class="icon-btn" title="Toggle Smart Bar">📋</button>
+                <button id="clearStorageBtn" class="icon-btn" title="Clear All Data">🗑️</button>
                 <button id="settingsBtn" class="icon-btn" title="Settings">⚙️</button>
             </div>
         </header>
@@ -31,15 +35,11 @@
         <main class="main-content">
             <!-- Left Panel: Navigation -->
             <aside class="left-panel" id="leftPanel">
-                <div class="panel-header">
-                    <h3 style="text-align: center;">Table of Contents</h3>
-                </div>
                 <div class="toc-container" id="tocContainer">
                     <div class="no-book-message">
                         <p>📚 Upload a book to see the table of contents</p>
                     </div>
                 </div>
-
             </aside>
 
             <!-- Middle Panel: Reading Area -->
@@ -93,7 +93,7 @@
             </div>
 
             <!-- Right Panel: Smart Sidebar -->
-            <aside class="right-panel" id="rightPanel">
+            <aside class="right-panel collapsed" id="rightPanel">
                 <div class="smart-bar-header">
                     <h3 class="smart-bar-title">📚 Smart Bar</h3>
                 </div>

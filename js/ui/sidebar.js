@@ -11,7 +11,8 @@ class SidebarManager {
         this.setupEventListeners();
         this.initializeModalManager();
         this.loadTextSize();
-        // this.hideTOCButton(); // Hide TOC button initially - TEMPORARILY DISABLED FOR TESTING
+        this.initializeRightPanelState(); // Initialize right panel state
+        this.hideTOCButton(); // Hide TOC button initially
     }
 
     initializeModalManager() {
@@ -92,6 +93,11 @@ class SidebarManager {
             this.closeSettingsModal();
         });
         
+        // Clear storage button
+        document.getElementById('clearStorageBtn').addEventListener('click', () => {
+            this.clearAllStorage();
+        });
+        
         // Fix focus persistence for note textarea in modal
         const noteTextarea = document.getElementById('noteTextarea');
         
@@ -155,16 +161,19 @@ class SidebarManager {
     toggleTOC() {
         const leftPanel = document.getElementById('leftPanel');
         const tocToggle = document.getElementById('tocToggle');
+        const tocArrow = tocToggle.querySelector('.toc-arrow');
         
         this.isTOCCollapsed = !this.isTOCCollapsed;
         
         if (this.isTOCCollapsed) {
             leftPanel.classList.add('collapsed');
-            tocToggle.textContent = '▶'; // Right arrow
+            tocToggle.classList.remove('expanded');
+            if (tocArrow) tocArrow.textContent = '▶'; // Right arrow
             tocToggle.title = 'Show Table of Contents';
         } else {
             leftPanel.classList.remove('collapsed');
-            tocToggle.textContent = '◀'; // Left arrow
+            tocToggle.classList.add('expanded');
+            if (tocArrow) tocArrow.textContent = '◀'; // Left arrow
             tocToggle.title = 'Hide Table of Contents';
         }
         
@@ -193,14 +202,28 @@ class SidebarManager {
     hideTOCButton() {
         const tocToggle = document.getElementById('tocToggle');
         if (tocToggle) {
-            tocToggle.style.display = 'none';
+            tocToggle.classList.add('hidden');
         }
     }
     
     showTOCButton() {
         const tocToggle = document.getElementById('tocToggle');
         if (tocToggle) {
-            tocToggle.style.display = 'inline-flex';
+            tocToggle.classList.remove('hidden');
+        }
+    }
+    
+    initializeRightPanelState() {
+        // Ensure the right panel button shows the correct state on load
+        const smartBarToggle = document.getElementById('smartBarToggle');
+        if (smartBarToggle) {
+            if (this.isCollapsed) {
+                smartBarToggle.textContent = '📖';
+                smartBarToggle.title = 'Show Smart Bar';
+            } else {
+                smartBarToggle.textContent = '📋';
+                smartBarToggle.title = 'Hide Smart Bar';
+            }
         }
     }
     
@@ -1027,24 +1050,27 @@ class SidebarManager {
     }
 
     saveSettings() {
+        const apiKey = document.getElementById('apiKey').value.trim();
         const settings = {
             apiEndpoint: 'https://webui.plebchat.me/ollama/v1', // Hardcoded endpoint
-            apiKey: document.getElementById('apiKey').value.trim(),
+            // Don't store apiKey in localStorage - only in cookies
             aiModel: document.getElementById('aiModel').value
         };
 
-        if (!settings.apiKey) {
+        if (!apiKey) {
             this.showError('Please enter an API key');
             return;
         }
 
         try {
+            // Save settings without API key to localStorage
             this.app.storage.saveSettings(settings);
+            
+            // Save API key ONLY to cookies (never localStorage)
+            document.cookie = `vibeReader_apiKey=${apiKey}; expires=${new Date(Date.now() + 365*24*60*60*1000).toUTCString()}; path=/; SameSite=Strict`;
+            
             this.closeSettingsModal();
             this.showSuccess('Settings saved successfully');
-            
-            // Also save API key to cookies as backup
-            document.cookie = `vibeReader_apiKey=${settings.apiKey}; expires=${new Date(Date.now() + 365*24*60*60*1000).toUTCString()}; path=/; SameSite=Strict`;
             
         } catch (error) {
             console.error('Failed to save settings:', error);
@@ -1113,6 +1139,38 @@ class SidebarManager {
             this.modalManager.showAlert(message, 'error');
         } else {
             alert('Error: ' + message);
+        }
+    }
+
+    clearAllStorage() {
+        // Confirm with user before clearing
+        if (!confirm('Are you sure you want to clear all data? This will remove all books, notes, highlights, and settings (except your API key).')) {
+            return;
+        }
+        
+        try {
+            // Get API key from cookie before clearing
+            const apiKey = this.getApiKeyFromCookie();
+            
+            // Clear all localStorage
+            localStorage.clear();
+            
+            // Restore API key to cookie if it existed
+            if (apiKey) {
+                document.cookie = `vibeReader_apiKey=${apiKey}; expires=${new Date(Date.now() + 365*24*60*60*1000).toUTCString()}; path=/; SameSite=Strict`;
+            }
+            
+            // Show success message
+            this.showSuccess('All data cleared successfully! API key preserved.');
+            
+            // Reload the page to reset the app state
+            setTimeout(() => {
+                window.location.reload();
+            }, 1500);
+            
+        } catch (error) {
+            console.error('Failed to clear storage:', error);
+            this.showError('Failed to clear storage: ' + error.message);
         }
     }
 

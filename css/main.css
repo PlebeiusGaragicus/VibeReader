@@ -62,6 +62,40 @@ body {
     align-items: center;
 }
 
+.toc-toggle-btn {
+    background: none;
+    border: none;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    padding: 0.5rem;
+    border-radius: 4px;
+    transition: background-color 0.2s ease;
+    color: var(--text-primary);
+    font-family: inherit;
+}
+
+.toc-toggle-btn:hover {
+    background-color: var(--bg-hover);
+    color: var(--accent-color);
+}
+
+.toc-text {
+    font-size: 0.9rem;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.toc-arrow {
+    font-size: 1rem;
+    transition: transform 0.2s ease;
+}
+
+.toc-toggle-btn.expanded .toc-arrow {
+    transform: rotate(90deg);
+}
+
 .file-upload-area {
     border: 2px dashed var(--border-color);
     border-radius: 8px;
@@ -152,14 +186,6 @@ body {
     display: none;  /* Default to collapsed */
     flex-direction: column;
     overflow: hidden;
-    transition: width 0.3s ease;
-}
-
-.right-panel {
-    border-right: none;
-    border-left: 1px solid var(--border-color);
-    display: flex;
-    flex-direction: column;
     transition: width 0.3s ease;
 }
 

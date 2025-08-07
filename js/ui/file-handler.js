@@ -130,8 +130,8 @@ class FileHandler {
 
     expandSidebarsOnBookLoad() {
         // Expand both TOC and Smart Bar when a book is loaded
-        if (this.app.sidebarManager) {
-            this.app.sidebarManager.expandSidebarsForBook();
+        if (this.app.sidebar) {
+            this.app.sidebar.expandSidebarsForBook();
         }
     }
 
