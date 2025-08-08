@@ -101,6 +101,46 @@ class FileHandler {
         }
     }
 
+    applyAIAnswers(askAnswers) {
+        if (!askAnswers || !askAnswers.length) return;
+        const readingContainer = document.getElementById('readingContainer');
+        if (!readingContainer || !window.HighlightEngine) return;
+
+        askAnswers.forEach(answer => {
+            try {
+                // Require both serialized range and a group highlightId
+                if (!answer || !answer.serializedRange || !answer.highlightId) return;
+
+                // Skip if already applied
+                const existing = document.querySelector(`.text-ai-highlight[data-highlight-id="${answer.highlightId}"]`);
+                if (existing) return;
+
+                const range = window.HighlightEngine.restoreRange(answer.serializedRange, readingContainer);
+                if (!range) return;
+
+                const ok = window.HighlightEngine.applyRangeHighlight(
+                    range,
+                    answer.highlightId,
+                    'text-ai-highlight',
+                    answer.timestamp
+                );
+                if (ok && this.app && this.app.sidebar && this.app.sidebar.addAIPopupEvents) {
+                    setTimeout(() => {
+                        const parts = document.querySelectorAll(`.text-ai-highlight[data-highlight-id="${answer.highlightId}"]`);
+                        parts.forEach(el => this.app.sidebar.addAIPopupEvents(el, {
+                            question: answer.question,
+                            answer: answer.answer,
+                            selectedText: answer.selectedText,
+                            answerId: answer.id
+                        }));
+                    }, 0);
+                }
+            } catch (e) {
+                console.warn('Failed to apply AI answer highlight:', e);
+            }
+        });
+    }
+
     async loadBook(bookId, bookData) {
         this.currentBook = {
             id: bookId,
@@ -254,6 +294,9 @@ class FileHandler {
         
         // Apply notes to content
         this.applyNotes(notes);
+
+        // Apply AI chat selections to content
+        this.applyAIAnswers(askAnswers);
     }
 
     applyHighlights(highlights) {
@@ -265,72 +308,76 @@ class FileHandler {
                     return; // Already applied
                 }
                 
-                // Apply highlight by finding and wrapping the text
-                this.applyHighlightToText(highlight);
+                // Robust engine-based restoration (single method)
+                if (window.HighlightEngine && highlight && highlight.serializedRange) {
+                    const root = document.getElementById('readingContainer');
+                    const range = window.HighlightEngine.restoreRange(highlight.serializedRange, root);
+                    if (range) {
+                        // Determine class from stored color
+                        const color = (highlight.color || 'yellow').toLowerCase();
+                        const className = (color && color !== 'yellow')
+                            ? `text-highlight-${color}`
+                            : 'text-highlight';
+                        const ok = window.HighlightEngine.applyRangeHighlight(
+                            range,
+                            highlight.id,
+                            className,
+                            highlight.timestamp
+                        );
+                        if (ok && this.app && this.app.sidebar && this.app.sidebar.addHighlightPopupEvents) {
+                            // Attach hover popup + click-to-scroll for all parts
+                            setTimeout(() => {
+                                const parts = document.querySelectorAll(`[class*="text-highlight"][data-highlight-id="${highlight.id}"]`);
+                                // Fallback selector for engines that set exact class names
+                                const partsStrict = document.querySelectorAll(`.text-highlight[data-highlight-id="${highlight.id}"], .text-highlight-red[data-highlight-id="${highlight.id}"], .text-highlight-orange[data-highlight-id="${highlight.id}"], .text-highlight-purple[data-highlight-id="${highlight.id}"], .text-highlight-brown[data-highlight-id="${highlight.id}"]`);
+                                const nodes = partsStrict.length ? partsStrict : parts;
+                                nodes.forEach(el => this.app.sidebar.addHighlightPopupEvents(el, highlight));
+                            }, 0);
+                        }
+                    }
+                }
             } catch (error) {
                 console.warn('Failed to apply highlight:', error);
             }
         });
     }
 
-    applyHighlightToText(highlight) {
-        const readingContainer = document.getElementById('readingContainer');
-        if (!readingContainer || !highlight.text) return;
-
-        // Find text nodes containing the highlighted text
-        const walker = document.createTreeWalker(
-            readingContainer,
-            NodeFilter.SHOW_TEXT,
-            null,
-            false
-        );
-
-        let node;
-        while (node = walker.nextNode()) {
-            const text = node.textContent;
-            const index = text.indexOf(highlight.text);
-            
-            if (index !== -1) {
-                // Found the text, wrap it with highlight
-                const parent = node.parentNode;
-                const beforeText = text.substring(0, index);
-                const highlightText = text.substring(index, index + highlight.text.length);
-                const afterText = text.substring(index + highlight.text.length);
-                
-                const fragment = document.createDocumentFragment();
-                
-                if (beforeText) {
-                    fragment.appendChild(document.createTextNode(beforeText));
-                }
-                
-                const highlightSpan = document.createElement('span');
-                highlightSpan.className = 'text-highlight';
-                highlightSpan.setAttribute('data-highlight-id', highlight.id);
-                highlightSpan.setAttribute('title', `Highlighted on ${new Date(highlight.timestamp).toLocaleDateString()}`);
-                highlightSpan.textContent = highlightText;
-                fragment.appendChild(highlightSpan);
-                
-                if (afterText) {
-                    fragment.appendChild(document.createTextNode(afterText));
-                }
-                
-                parent.replaceChild(fragment, node);
-                break; // Only highlight the first occurrence
-            }
-        }
-    }
-
     applyNotes(notes) {
         notes.forEach(note => {
             try {
-                // Check if note already exists in DOM
-                const existingElement = document.querySelector(`[data-note-id="${note.id}"]`);
+                // Check if note already exists in DOM (new engine spans or legacy spans)
+                const existingElement = document.querySelector(`[data-highlight-id="${note.id}"], [data-note-id="${note.id}"]`);
                 if (existingElement) {
                     return; // Already applied
                 }
-                
-                // Apply note highlight by finding and wrapping the text
-                this.applyNoteToText(note);
+
+                // Prefer robust engine-based restoration if available
+                let applied = false;
+                if (window.HighlightEngine && note && note.serializedRange) {
+                    const root = document.getElementById('readingContainer');
+                    const range = window.HighlightEngine.restoreRange(note.serializedRange, root);
+                    if (range) {
+                        applied = window.HighlightEngine.applyRangeHighlight(
+                            range,
+                            note.id,
+                            'text-note-highlight',
+                            note.timestamp
+                        );
+                        if (applied && this.app && this.app.sidebar && this.app.sidebar.addNotePopupEvents) {
+                            setTimeout(() => {
+                                const parts = document.querySelectorAll(`.text-note-highlight[data-highlight-id="${note.id}"]`);
+                                parts.forEach(el => {
+                                    this.app.sidebar.addNotePopupEvents(el, note);
+                                });
+                            }, 0);
+                        }
+                    }
+                }
+
+                // Fallback: legacy text-based wrap
+                if (!applied) {
+                    this.applyNoteToText(note);
+                }
             } catch (error) {
                 console.warn('Failed to apply note:', error);
             }

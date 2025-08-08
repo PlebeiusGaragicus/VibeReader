@@ -4,6 +4,12 @@ class EndnoteHandler {
     constructor(app) {
         this.app = app;
         this.endnotes = new Map(); // Store endnote content
+        // Track currently visible popup and timers
+        this.activePopup = null;
+        this.activeAnchor = null;
+        this.hidePopupTimeout = null;
+        this.hoverShowTimeout = null;
+        this.hoverHideTimeout = null;
         this.setupEventListeners();
     }
 
@@ -24,12 +30,14 @@ class EndnoteHandler {
             }
         });
 
-        // Escape key to close modal
+        // Escape key to close modal or popup
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
                 const modal = document.getElementById('endnoteModal');
                 if (!modal.classList.contains('hidden')) {
                     this.closeEndnoteModal();
+                } else {
+                    this.hideAllEndnotePopups();
                 }
             }
         });
@@ -42,9 +50,63 @@ class EndnoteHandler {
                 e.stopPropagation();
                 
                 const endnoteId = this.extractEndnoteIdFromLink(link);
-                this.showEndnote(endnoteId);
+                // Always show popup near the link
+                this.showEndnotePopup(endnoteId, link);
             }
         }, true); // Use capture phase to intercept before other handlers
+
+        // Dismiss popup when clicking outside
+        document.addEventListener('mousedown', (e) => {
+            if (!this.activePopup) return;
+            const clickedInside = this.activePopup.contains(e.target) || (this.activeAnchor && this.activeAnchor.contains(e.target));
+            if (!clickedInside) {
+                this.hideAllEndnotePopups();
+            }
+        });
+
+        // Delegate clicks inside the reading container for both converted spans and raw links
+        const readingContainer = document.getElementById('readingContainer');
+        if (readingContainer) {
+            readingContainer.addEventListener('click', (e) => {
+                const el = e.target.closest('span.endnote-ref, a');
+                if (!el) return;
+                let endnoteId = null;
+                if (el.matches('span.endnote-ref')) {
+                    endnoteId = el.getAttribute('data-endnote-id');
+                } else if (this.isEndnoteLinkElement(el)) {
+                    endnoteId = this.extractEndnoteIdFromLink(el);
+                }
+                if (!endnoteId) return;
+                e.preventDefault();
+                e.stopPropagation();
+                // Always show popup on click
+                this.showEndnotePopup(endnoteId, el);
+            });
+
+            // Hover support (debounced show/hide)
+            readingContainer.addEventListener('mouseover', (e) => {
+                const el = e.target.closest('span.endnote-ref, a');
+                if (!el) return;
+                if (el.matches('a') && !this.isEndnoteLinkElement(el)) return;
+                const endnoteId = el.matches('span.endnote-ref') ? el.getAttribute('data-endnote-id') : this.extractEndnoteIdFromLink(el);
+                if (!endnoteId) return;
+                if (this.hoverHideTimeout) { clearTimeout(this.hoverHideTimeout); this.hoverHideTimeout = null; }
+                if (this.hoverShowTimeout) { clearTimeout(this.hoverShowTimeout); }
+                this.hoverShowTimeout = setTimeout(() => {
+                    this.showEndnotePopup(endnoteId, el);
+                }, 180);
+            });
+            readingContainer.addEventListener('mouseout', (e) => {
+                const el = e.target.closest('span.endnote-ref, a');
+                if (!el) return;
+                if (el.matches('a') && !this.isEndnoteLinkElement(el)) return;
+                if (this.hoverShowTimeout) { clearTimeout(this.hoverShowTimeout); this.hoverShowTimeout = null; }
+                // Delay hide to allow moving into popup
+                this.hoverHideTimeout = setTimeout(() => {
+                    this.hideAllEndnotePopups();
+                }, 200);
+            });
+        }
     }
 
     // Process endnotes in the content and convert links to modal triggers
@@ -174,13 +236,28 @@ class EndnoteHandler {
         endnoteRef.className = 'endnote-ref';
         endnoteRef.setAttribute('data-endnote-id', endnoteId);
         endnoteRef.innerHTML = link.innerHTML; // Preserve original content (like <sup>)
-        endnoteRef.title = `Click to view endnote ${endnoteId}`;
+        endnoteRef.title = `Click or hover to view endnote ${endnoteId}`;
 
-        // Add click handler
+        // Add click handler (Shift+Click opens modal)
         endnoteRef.addEventListener('click', (e) => {
             e.preventDefault();
             e.stopPropagation();
-            this.showEndnote(endnoteId);
+            if (e.shiftKey) {
+                this.showEndnote(endnoteId);
+            } else {
+                this.showEndnotePopup(endnoteId, endnoteRef);
+            }
+        });
+
+        // Hover interactions with slight delay for better UX
+        endnoteRef.addEventListener('mouseenter', () => {
+            if (this.hoverHideTimeout) { clearTimeout(this.hoverHideTimeout); this.hoverHideTimeout = null; }
+            if (this.hoverShowTimeout) { clearTimeout(this.hoverShowTimeout); }
+            this.hoverShowTimeout = setTimeout(() => this.showEndnotePopup(endnoteId, endnoteRef), 180);
+        });
+        endnoteRef.addEventListener('mouseleave', () => {
+            if (this.hoverShowTimeout) { clearTimeout(this.hoverShowTimeout); this.hoverShowTimeout = null; }
+            this.hoverHideTimeout = setTimeout(() => this.hideAllEndnotePopups(), 200);
         });
 
         // Replace the original link
@@ -284,6 +361,105 @@ class EndnoteHandler {
         console.log(`Showing endnote ${endnoteId}, available endnotes:`, Array.from(this.endnotes.keys()));
     }
 
+    // Create or update floating popup for endnote
+    showEndnotePopup(endnoteId, anchorEl) {
+        // Resolve content similar to modal
+        let content = this.endnotes.get(endnoteId) || this.findEndnoteInDocument(endnoteId);
+        if (!content) {
+            content = `<p><strong>Endnote ${endnoteId}</strong></p><p>Content not found in this chapter.</p><p><small>Shift+Click to open the endnote modal.</small></p>`;
+        }
+
+        // If popup already exists for this anchor/id, just reposition and return
+        if (this.activePopup && this.activePopup.dataset.endnoteId === String(endnoteId)) {
+            this.positionEndnotePopup(this.activePopup, anchorEl);
+            return;
+        }
+
+        // Remove any existing popup
+        this.hideAllEndnotePopups();
+
+        // Build popup element
+        const popup = document.createElement('div');
+        popup.className = 'endnote-popup';
+        popup.dataset.endnoteId = String(endnoteId);
+        popup.innerHTML = `
+            <div class="endnote-popup-header">
+                <div class="title">Endnote ${this.app?.escapeHTML ? this.app.escapeHTML(String(endnoteId)) : endnoteId}</div>
+                <button class="close-btn" aria-label="Close">×</button>
+            </div>
+            <div class="endnote-popup-content">${content}</div>
+            <div class="endnote-popup-actions">
+                <button class="open-modal-btn" title="Open in modal">Open</button>
+            </div>
+        `;
+
+        document.body.appendChild(popup);
+
+        // Wire interactions
+        const closeBtn = popup.querySelector('.close-btn');
+        const openBtn = popup.querySelector('.open-modal-btn');
+        closeBtn?.addEventListener('click', (e) => { e.stopPropagation(); this.hideAllEndnotePopups(); });
+        openBtn?.addEventListener('click', (e) => { e.stopPropagation(); this.hideAllEndnotePopups(); this.showEndnote(endnoteId); });
+
+        // Keep open when hovering over the popup (so moving from ref -> popup doesn't close it)
+        popup.addEventListener('mouseenter', () => {
+            if (this.hoverHideTimeout) { clearTimeout(this.hoverHideTimeout); this.hoverHideTimeout = null; }
+            if (this.hidePopupTimeout) { clearTimeout(this.hidePopupTimeout); this.hidePopupTimeout = null; }
+        });
+        popup.addEventListener('mouseleave', () => {
+            this.hoverHideTimeout = setTimeout(() => this.hideAllEndnotePopups(), 200);
+        });
+
+        // Save state and position
+        this.activePopup = popup;
+        this.activeAnchor = anchorEl;
+        this.positionEndnotePopup(popup, anchorEl);
+
+        // Small animation class
+        requestAnimationFrame(() => popup.classList.add('show'));
+    }
+
+    // Position popup near the anchor while staying in viewport
+    positionEndnotePopup(popup, anchorEl) {
+        const rect = anchorEl.getBoundingClientRect();
+        const scrollX = window.scrollX || window.pageXOffset;
+        const scrollY = window.scrollY || window.pageYOffset;
+
+        // Default above the anchor
+        const margin = 8;
+        popup.style.position = 'absolute';
+        popup.style.maxWidth = '360px';
+        popup.style.left = `${scrollX + rect.left}px`;
+        popup.style.top = `${scrollY + Math.max(0, rect.top - popup.offsetHeight - margin)}px`;
+
+        // If offscreen above, place below
+        const desiredTop = scrollY + rect.top - popup.offsetHeight - margin;
+        if (desiredTop < scrollY + 10) {
+            popup.style.top = `${scrollY + rect.bottom + margin}px`;
+        }
+
+        // Nudge horizontally if overflowing
+        const right = parseFloat(popup.style.left) + popup.offsetWidth;
+        const viewportRight = scrollX + document.documentElement.clientWidth - 10;
+        if (right > viewportRight) {
+            const newLeft = Math.max(scrollX + 10, viewportRight - popup.offsetWidth);
+            popup.style.left = `${newLeft}px`;
+        }
+    }
+
+    // Hide and remove any active popup
+    hideAllEndnotePopups() {
+        if (this.hidePopupTimeout) {
+            clearTimeout(this.hidePopupTimeout);
+            this.hidePopupTimeout = null;
+        }
+        if (this.activePopup && this.activePopup.parentNode) {
+            this.activePopup.parentNode.removeChild(this.activePopup);
+        }
+        this.activePopup = null;
+        this.activeAnchor = null;
+    }
+
     // Try to find endnote content in the current document
     findEndnoteInDocument(endnoteId) {
         const readingContainer = document.getElementById('readingContainer');
@@ -328,6 +504,8 @@ class EndnoteHandler {
     closeEndnoteModal() {
         const modal = document.getElementById('endnoteModal');
         modal.classList.add('hidden');
+        // Also hide floating popup if any (to avoid dual UIs)
+        this.hideAllEndnotePopups();
     }
 
     // Clear all endnotes (when loading new book)

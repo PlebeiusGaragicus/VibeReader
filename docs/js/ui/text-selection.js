@@ -122,13 +122,21 @@ class TextSelectionHandler {
         console.log('Highlighting text:', this.selectedText);
 
         try {
+            // Prepare serialized range (XPath + offsets) for robust persistence
+            const readingContainer = document.getElementById('readingContainer');
+            let serializedRange = null;
+            if (window.HighlightEngine && this.selectedRange) {
+                serializedRange = window.HighlightEngine.serializeRange(this.selectedRange, readingContainer);
+            }
+
             // Create highlight data
             const highlight = {
                 id: this.generateHighlightId(),
                 text: this.selectedText,
                 timestamp: new Date().toISOString(),
                 chapter: this.getCurrentChapter(),
-                color: 'yellow' // Default color
+                color: 'yellow', // Default color
+                serializedRange
             };
 
             console.log('Created highlight object:', highlight);
@@ -169,34 +177,62 @@ class TextSelectionHandler {
         console.log('Applying highlight:', highlight.id, 'to text:', highlight.text);
 
         try {
-            // Check if the range can be safely wrapped with surroundContents
-            const canUseSurround = this.canUseSurroundContents(this.selectedRange);
-            console.log('Can use surroundContents:', canUseSurround);
-            
-            if (canUseSurround) {
-                console.log('Using surroundContents method');
-                // Create highlight span
-                const highlightSpan = document.createElement('span');
-                highlightSpan.className = 'text-highlight';
-                highlightSpan.setAttribute('data-highlight-id', highlight.id);
-                highlightSpan.setAttribute('title', `Highlighted on ${new Date(highlight.timestamp).toLocaleDateString()}`);
-
-                // Wrap the selected content
-                this.selectedRange.surroundContents(highlightSpan);
-                console.log('Successfully applied highlight with surroundContents');
-                console.log('Highlight span content:', highlightSpan.textContent);
-                console.log('Highlight span HTML:', highlightSpan.outerHTML);
-            } else {
-                console.log('Using marker-based highlighting for complex selection');
-                // Use marker-based approach for complex selections
-                this.applyMarkerBasedHighlight(highlight);
+            // First, try the robust engine-based approach (cross-paragraph safe)
+            let appliedOk = false;
+            if (window.HighlightEngine) {
+                const root = document.getElementById('readingContainer');
+                const rangeToApply = (highlight && highlight.serializedRange)
+                    ? window.HighlightEngine.restoreRange(highlight.serializedRange, root)
+                    : this.selectedRange;
+                if (rangeToApply) {
+                    const ok = window.HighlightEngine.applyRangeHighlight(
+                        rangeToApply,
+                        highlight.id,
+                        'text-highlight',
+                        highlight.timestamp
+                    );
+                    if (ok) {
+                        appliedOk = true; // Applied successfully
+                    }
+                }
             }
-            
+
+            if (!appliedOk) {
+                // Check if the range can be safely wrapped with surroundContents
+                const canUseSurround = this.canUseSurroundContents(this.selectedRange);
+                console.log('Can use surroundContents:', canUseSurround);
+                
+                if (canUseSurround) {
+                    console.log('Using surroundContents method');
+                    // Create highlight span
+                    const highlightSpan = document.createElement('span');
+                    highlightSpan.className = 'text-highlight';
+                    highlightSpan.setAttribute('data-highlight-id', highlight.id);
+                    highlightSpan.setAttribute('title', `Highlighted on ${new Date(highlight.timestamp).toLocaleDateString()}`);
+
+                    // Wrap the selected content
+                    this.selectedRange.surroundContents(highlightSpan);
+                    console.log('Successfully applied highlight with surroundContents');
+                    console.log('Highlight span content:', highlightSpan.textContent);
+                    console.log('Highlight span HTML:', highlightSpan.outerHTML);
+                } else {
+                    console.log('Using marker-based highlighting for complex selection');
+                    // Use marker-based approach for complex selections
+                    this.applyMarkerBasedHighlight(highlight);
+                }
+            }
+        
         } catch (error) {
             // Fallback: try marker-based highlighting
             console.warn('Failed to apply highlight with surroundContents, trying marker-based approach:', error);
             this.applyMarkerBasedHighlight(highlight);
         }
+
+        // Attach hover popup events to the newly created highlight spans immediately
+        setTimeout(() => {
+            const parts = document.querySelectorAll(`.text-highlight[data-highlight-id="${highlight.id}"]`);
+            parts.forEach(el => this.app.sidebar.addHighlightPopupEvents(el, highlight));
+        }, 0);
     }
 
     canUseSurroundContents(range) {
@@ -424,6 +460,8 @@ class TextSelectionHandler {
         // CRITICAL FIX: Preserve selected text for the Ask AI bubble
         // The hideSelectionMenu() call clears this.selectedText, so we need to preserve it
         this.preservedSelectedText = this.selectedText;
+        // Also preserve the selection range so we can serialize/apply it for AI
+        this.preservedSelectedRangeForAI = this.selectedRange ? this.selectedRange.cloneRange() : null;
         
         // Show the AI question bubble
         this.showAIQuestionBubble();
@@ -574,8 +612,56 @@ class TextSelectionHandler {
                 throw new Error('No text selected. Please select some text first.');
             }
 
+            // Serialize the preserved selection range (if available) and apply a visible AI highlight
+            const readingContainer = document.getElementById('readingContainer');
+            let serializedRange = null;
+            let aiHighlightId = null;
+            const rangeToUse = this.preservedSelectedRangeForAI || this.selectedRange || null;
+            if (window.HighlightEngine && readingContainer && rangeToUse) {
+                try {
+                    serializedRange = window.HighlightEngine.serializeRange(rangeToUse, readingContainer);
+                    aiHighlightId = 'ai_sel_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
+                    // Apply a visual highlight for AI selection
+                    let applied = window.HighlightEngine.applyRangeHighlight(
+                        rangeToUse,
+                        aiHighlightId,
+                        'text-ai-highlight',
+                        Date.now()
+                    );
+                    // If initial apply failed (e.g., stale range), try restoring from serialized range
+                    if (!applied && serializedRange) {
+                        const restored = window.HighlightEngine.restoreRange(serializedRange, readingContainer);
+                        if (restored) {
+                            applied = window.HighlightEngine.applyRangeHighlight(
+                                restored,
+                                aiHighlightId,
+                                'text-ai-highlight',
+                                Date.now()
+                            );
+                        }
+                    }
+                    // Attach AI popup hover immediately (will show waiting state until answer comes)
+                    setTimeout(() => {
+                        const parts = document.querySelectorAll(`.text-ai-highlight[data-highlight-id="${aiHighlightId}"]`);
+                        if (parts && parts.length) {
+                            parts.forEach(el => this.app.sidebar.addAIPopupEvents(el, {
+                                question,
+                                selectedText: selectedTextToUse,
+                                answer: null
+                            }));
+                        }
+                    }, 0);
+                } catch (e) {
+                    console.warn('Failed to serialize/apply AI selection highlight:', e);
+                }
+            }
+
             // Immediately add thinking placeholder to smart bar
-            const thinkingId = this.app.sidebar.addThinkingAIChat(question, selectedTextToUse);
+            const thinkingId = this.app.sidebar.addThinkingAIChat(
+                question,
+                selectedTextToUse,
+                { serializedRange, highlightId: aiHighlightId }
+            );
             
             // Hide bubble immediately
             this.hideBubble();
@@ -589,16 +675,25 @@ class TextSelectionHandler {
                 currentBook
             );
 
-            // Update the thinking placeholder with the actual response
-            this.app.sidebar.updateAIChat(thinkingId, response);
+            // Generate a consistent answerId so sidebar can de-dupe items
+            const answerId = this.generateAnswerId();
 
-            // Also add to traditional Ask Answers for backward compatibility
+            // Update the thinking placeholder with the actual response and IDs
+            this.app.sidebar.updateAIChat(thinkingId, response, {
+                id: answerId,
+                serializedRange,
+                highlightId: aiHighlightId
+            });
+
+            // Save to Ask Answers (also updates the sidebar list; dedupe will merge by answerId)
             this.addToAskAnswers({
                 question: question,
                 selectedText: selectedTextToUse,
                 answer: response,
-                timestamp: new Date().toISOString()
-            });
+                timestamp: new Date().toISOString(),
+                serializedRange,
+                highlightId: aiHighlightId
+            }, answerId);
 
         } catch (error) {
             console.error('AI question error:', error);
@@ -617,15 +712,16 @@ class TextSelectionHandler {
         // Clear selection and preserved text
         this.clearSelection();
         this.preservedSelectedText = null;
+        this.preservedSelectedRangeForAI = null;
     }
 
-    addToAskAnswers(answerData) {
+    addToAskAnswers(answerData, providedId = null) {
         // Save to storage
         const bookId = this.app.fileHandler.getCurrentBook()?.id;
         if (bookId) {
             const askAnswers = this.app.storage.getAskAnswers(bookId) || [];
             const answerItem = {
-                id: this.generateAnswerId(),
+                id: providedId || this.generateAnswerId(),
                 ...answerData
             };
             askAnswers.unshift(answerItem); // Add to beginning
@@ -633,6 +729,8 @@ class TextSelectionHandler {
             
             // Update sidebar display
             this.app.sidebar.displayAskAnswers(askAnswers);
+
+            return answerItem;
         }
     }
 

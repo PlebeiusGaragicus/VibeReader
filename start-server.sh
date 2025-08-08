@@ -13,14 +13,15 @@ NC='\033[0m' # No Color
 # Configuration
 PORT=8081
 HOST="0.0.0.0"
+SERVE_DIR="docs"
 
 echo -e "${BLUE}🚀 Starting VibeReader Development Server${NC}"
 echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 
-# Check if we're in the right directory
-if [ ! -f "index.html" ]; then
-    echo -e "${RED}❌ Error: index.html not found in current directory${NC}"
-    echo -e "${YELLOW}Please run this script from the VibeReader project directory${NC}"
+# Check that docs/ exists and has an index.html for GitHub Pages layout
+if [ ! -f "$SERVE_DIR/index.html" ]; then
+    echo -e "${RED}❌ Error: $SERVE_DIR/index.html not found${NC}"
+    echo -e "${YELLOW}Please ensure your site files are in the '$SERVE_DIR/' directory (GitHub Pages configuration)${NC}"
     exit 1
 fi
 
@@ -111,8 +112,8 @@ def signal_handler(signum, frame):
 signal.signal(signal.SIGINT, signal_handler)
 signal.signal(signal.SIGTERM, signal_handler)
 
-# Change to the script directory
-os.chdir('$(pwd)')
+# Change to the docs directory to serve GitHub Pages structure
+os.chdir('$(pwd)/docs')
 
 # Start server with proper cleanup
 try:
@@ -138,5 +139,5 @@ finally:
 else
     # Python 2 fallback
     echo -e "${YELLOW}⚠️  Using Python 2 - limited logging available${NC}"
-    $PYTHON_CMD -m SimpleHTTPServer $PORT
+    ( cd "$SERVE_DIR" && $PYTHON_CMD -m SimpleHTTPServer $PORT )
 fi
