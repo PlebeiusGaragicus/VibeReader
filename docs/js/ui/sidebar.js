@@ -197,37 +197,49 @@ class SidebarManager {
             if (hideTimeout) { clearTimeout(hideTimeout); hideTimeout = null; }
             this.hideAllAIPopups();
 
-            popup = document.createElement('div');
-            popup.className = 'ai-popup';
-            const safeQ = this.escapeHTML(ai?.question || '');
-            const safeSel = this.escapeHTML(ai?.selectedText || '');
-            const safeA = this.escapeHTML(ai?.answer || '');
-            popup.innerHTML = `
-                <div class="ai-popup-header">
-                    <span>🤖</span>
-                    <span>AI Chat</span>
-                </div>
-                <div class="ai-popup-content">
-                    ${safeQ ? `<div class="ai-q">Q: ${safeQ}</div>` : ''}
-                    ${safeSel ? `<div class="ai-selected">"${safeSel}"</div>` : ''}
-                    ${safeA ? `<div class="ai-a">A: ${safeA}</div>` : '<div class="ai-a">Awaiting answer…</div>'}
-                </div>
-                <div class="ai-popup-actions">
-                    <button class="btn-danger ai-delete">Delete</button>
-                </div>
-            `;
+popup = document.createElement('div');
+popup.className = 'ai-popup';
+const safeQ = this.escapeHTML(ai?.question || '');
+const safeSel = this.escapeHTML(ai?.selectedText || '');
+const safeA = this.escapeHTML(ai?.answer || '');
+const truncatedSel = safeSel && safeSel.length > 240 ? (safeSel.substring(0, 240) + '…') : safeSel;
+popup.innerHTML = `
+<div class="ai-popup-header">
+<span>💬</span>
+<span>AI Chat</span>
+</div>
+<div class="ai-popup-content">
+${truncatedSel ? `<div class="ai-sel">${truncatedSel}</div>` : ''}
+${safeQ ? `
+<div class="ai-bubble user">
+<div class="bubble-label">you said:</div>
+<div class="bubble-text">${safeQ}</div>
+</div>
+` : ''}
+${safeA ? `
+<div class="ai-bubble ai">
+<div class="bubble-label">AI replied:</div>
+<div class="bubble-text">${safeA}</div>
+</div>
+` : ''}
+<div class="ai-actions" style="margin-top: 0.5rem; display:flex; justify-content:flex-end;">
+<button class="ai-delete">Delete</button>
+</div>
+</div>
+`;
 
-            document.body.appendChild(popup);
-            const rect = aiSpan.getBoundingClientRect();
-            const popupRect = popup.getBoundingClientRect();
-            let left = rect.left + (rect.width / 2) - (popupRect.width / 2);
-            let top = rect.bottom + 8;
-            if (left < 10) left = 10;
-            if (left + popupRect.width > window.innerWidth - 10) left = window.innerWidth - popupRect.width - 10;
-            if (top + popupRect.height > window.innerHeight - 10) top = rect.top - popupRect.height - 8;
-            popup.style.left = `${left}px`;
-            popup.style.top = `${top}px`;
-            setTimeout(() => popup.classList.add('show'), 10);
+document.body.appendChild(popup);
+const rect = aiSpan.getBoundingClientRect();
+const popupRect = popup.getBoundingClientRect();
+let left = rect.left + (rect.width / 2) - (popupRect.width / 2);
+let top = rect.bottom + 8;
+if (left < 10) left = 10;
+if (left + popupRect.width > window.innerWidth - 10) left = window.innerWidth - popupRect.width - 10;
+if (top + popupRect.height > window.innerHeight - 10) top = rect.top - popupRect.height - 8;
+popup.style.left = `${left}px`;
+popup.style.top = `${top}px`;
+setTimeout(() => popup.classList.add('show'), 10);
+            
 
             // Wire delete button
             const delBtn = popup.querySelector('.ai-delete');
@@ -420,18 +432,84 @@ class SidebarManager {
             item = this.activityItems.find(i => i.type === 'highlight' && i.metadata && i.metadata.highlightId === groupId);
         }
         if (!item) return;
-        this.scrollActivityFeedToItem(item.id);
-        this.flashActivityItem(item.id);
+        // Ensure the Smart Bar and the correct section are visible before scrolling
+        this.ensureSmartBarAndSectionVisible(type);
+        // Wait one animation frame so layout updates after expansion, then scroll
+        requestAnimationFrame(() => {
+            this.scrollActivityFeedToItem(item.id);
+            this.flashActivityItem(item.id);
+        });
     }
 
-    scrollActivityFeedToItem(activityId) {
+    // Ensure Smart Bar is expanded and the relevant section is open
+    ensureSmartBarAndSectionVisible(type) {
+        // Expand Smart Bar if collapsed
+        const rightPanel = document.getElementById('rightPanel');
+        const smartBarToggle = document.getElementById('smartBarToggle');
+        if (rightPanel && rightPanel.classList.contains('collapsed')) {
+            rightPanel.classList.remove('collapsed');
+            this.isCollapsed = false;
+            if (smartBarToggle) {
+                smartBarToggle.textContent = '📋';
+                smartBarToggle.title = 'Hide Smart Bar';
+            }
+            localStorage.setItem('vibeReader_smartBarCollapsed', 'false');
+        }
+
+        // Expand the matching section
+        const sectionMap = { 'ai-chat': 'askAI', 'highlight': 'highlights', 'note': 'notes' };
+        const sectionName = sectionMap[type] || null;
+        if (sectionName) {
+            this.expandSection(sectionName);
+        }
+    }
+
+    // Expand a sidebar section by name if it is collapsed
+    expandSection(sectionName) {
+        const header = document.querySelector(`[data-section="${sectionName}"]`);
+        const content = document.getElementById(`${sectionName}Content`);
+        const sidebarSection = header?.closest('.sidebar-section');
+        const toggle = header?.querySelector('.section-toggle');
+        if (header && content && toggle && sidebarSection) {
+            const isExpanded = toggle.getAttribute('aria-expanded') === 'true';
+            if (!isExpanded) {
+                content.classList.remove('collapsed');
+                sidebarSection.classList.remove('collapsed');
+                toggle.setAttribute('aria-expanded', 'true');
+                // Persist state
+                this.saveSectionState(sectionName, true);
+            }
+        }
+    }
+
+    scrollActivityFeedToItem(activityId, attempt = 0) {
         const feed = document.getElementById('activityFeed');
-        const container = document.getElementById('smartBarContent') || feed?.parentElement;
-        if (!feed || !container) return;
+        if (!feed) return;
         const itemEl = feed.querySelector(`.activity-item[data-id="${activityId}"]`);
-        if (!itemEl) return;
-        const top = itemEl.offsetTop - 12;
-        container.scrollTo({ top, behavior: 'smooth' });
+        if (!itemEl) {
+            if (attempt < 5) {
+                // Try again shortly in case the feed just re-rendered
+                setTimeout(() => this.scrollActivityFeedToItem(activityId, attempt + 1), 80);
+            }
+            return;
+        }
+        // Try native scrollIntoView on the nearest scroll container (should be feed)
+        try { itemEl.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' }); } catch(e) {}
+        // After a frame, verify item is in view; if not, compute precise offset
+        requestAnimationFrame(() => {
+            if (!this.isElementInFeedView(feed, itemEl)) {
+                const feedRect = feed.getBoundingClientRect();
+                const itemRect = itemEl.getBoundingClientRect();
+                const top = (itemRect.top - feedRect.top) + feed.scrollTop - 12;
+                feed.scrollTo({ top, behavior: 'smooth' });
+            }
+        });
+    }
+
+    isElementInFeedView(feed, el) {
+        const fr = feed.getBoundingClientRect();
+        const er = el.getBoundingClientRect();
+        return er.top >= fr.top && er.bottom <= fr.bottom;
     }
 
     flashActivityItem(activityId) {
@@ -1176,7 +1254,7 @@ class SidebarManager {
         const icons = {
             highlight: '🖍',
             note: '📝',
-            'ai-chat': '🤖',
+            'ai-chat': '💬',
             thinking: '🤔'
         };
         

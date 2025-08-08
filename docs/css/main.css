@@ -1625,8 +1625,79 @@ textarea {
 }
 
 .ai-popup-content { color: var(--text-primary); line-height: 1.5; max-height: 50vh; overflow-y: auto; }
-.ai-popup-content .ai-q, .ai-popup-content .ai-sel, .ai-popup-content .ai-a { margin-bottom: 0.35rem; }
-.ai-popup-content .ai-a em { color: var(--text-secondary); }
+.ai-popup-content .ai-sel { 
+  margin-bottom: 0.5rem; 
+  background: rgba(251, 191, 36, 0.25); /* soft yellow */
+  border-left: 3px solid #fbbf24; 
+  padding: 0.4rem 0.5rem; 
+  border-radius: 6px; 
+}
+
+/* Chat bubble layout */
+.ai-popup-content .ai-bubble { 
+  display: flex; 
+  flex-direction: column; 
+  gap: 0.15rem; 
+  margin: 0.35rem 0; 
+}
+.ai-popup-content .ai-bubble .bubble-label { 
+  font-size: 0.75rem; 
+  color: var(--text-secondary);
+}
+.ai-popup-content .ai-bubble .bubble-text { 
+  padding: 0.5rem 0.6rem; 
+  border-radius: 12px; 
+  border: 1px solid var(--border-color, #e5e7eb);
+  background: var(--bg-secondary, #f3f4f6);
+  color: var(--text-primary);
+  word-wrap: break-word;
+  white-space: pre-wrap;
+}
+.ai-popup-content .ai-bubble.user { 
+  align-items: flex-end; 
+}
+.ai-popup-content .ai-bubble.user .bubble-text { 
+  border-radius: 12px 12px 0 12px; 
+  text-align: right; 
+}
+.ai-popup-content .ai-bubble.user .bubble-label {
+  text-align: right;
+}
+.ai-popup-content .ai-bubble.ai { 
+  align-items: flex-start; 
+}
+.ai-popup-content .ai-bubble.ai .bubble-text { 
+    border-radius: 12px 12px 12px 0; 
+    background: #eef2ff; /* soft indigo */
+    border-color: #c7d2fe; 
+}
+
+/* Dark theme tweaks for AI popup */
+body.dark-theme .ai-popup {
+  border-color: #60a5fa; /* lighter blue */
+}
+body.dark-theme .ai-popup::before {
+  border-bottom-color: #60a5fa;
+}
+body.dark-theme .ai-popup-header {
+  color: #93c5fd; /* header text */
+}
+body.dark-theme .ai-popup-content .ai-sel {
+  background: rgba(251, 191, 36, 0.18);
+  border-left-color: #fbbf24;
+}
+body.dark-theme .ai-popup-content .ai-bubble .bubble-text {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.18);
+  color: var(--text-primary);
+}
+body.dark-theme .ai-popup-content .ai-bubble.user .bubble-text {
+  background: rgba(255, 255, 255, 0.06);
+}
+body.dark-theme .ai-popup-content .ai-bubble.ai .bubble-text {
+  background: rgba(99, 102, 241, 0.18); /* indigo tint */
+  border-color: rgba(99, 102, 241, 0.4);
+}
 
 /* Inline Highlight popup */
 .highlight-popup {
