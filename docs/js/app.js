@@ -38,10 +38,13 @@ class VibeReaderApp {
             // Check for previously loaded books
             this.checkForStoredBooks();
             
-            // Add build info to meta tag for cache busting
+            // Determine build number from <title> and add cache-busting info
+            const titleText = document.title || '';
+            const match = titleText.match(/build:\s*(\d+)/i);
+            this.buildNumber = match ? match[1] : null;
             this.addBuildInfoToPage();
             
-            console.log(`VibeReader initialized successfully (Build ${BuildInfo.build})`);
+            console.log(`VibeReader initialized successfully (Build ${this.buildNumber ?? 'unknown'})`);
             
         } catch (error) {
             console.error('Failed to initialize VibeReader:', error);
@@ -375,43 +378,45 @@ class VibeReaderApp {
     }
     
     addBuildInfoToPage() {
-        // Add build info to meta tag for cache busting
-        if (window.BuildInfo) {
-            // Add or update meta tag
-            let metaTag = document.querySelector('meta[name="build"]');
-            if (!metaTag) {
-                metaTag = document.createElement('meta');
-                metaTag.setAttribute('name', 'build');
-                document.head.appendChild(metaTag);
-            }
-            metaTag.setAttribute('content', BuildInfo.build);
-            
-            // Add build info comment after title
-            const titleTag = document.querySelector('title');
-            if (titleTag && titleTag.nextSibling?.nodeType !== Node.COMMENT_NODE) {
-                const buildComment = document.createComment(` BUILD: ${BuildInfo.build} `);
-                titleTag.parentNode.insertBefore(buildComment, titleTag.nextSibling);
-            }
-            
-            // Update build info in UI
-            const buildInfoElement = document.getElementById('buildInfo');
-            if (buildInfoElement) {
-                buildInfoElement.textContent = `Build: ${BuildInfo.build}`;
-            }
-            
-            // Add cache busting to all CSS and JS files
-            this.addCacheBustingToResources();
-            
-            // Add basic styling for build info
-            this.addBuildInfoStyles();
-            
-            console.log(`Build info added: Build ${BuildInfo.build}`);
+        // Add build info to meta tag for cache busting using title-based build number
+        const build = this.buildNumber;
+        if (!build) return;
+        
+        // Add or update meta tag
+        let metaTag = document.querySelector('meta[name="build"]');
+        if (!metaTag) {
+            metaTag = document.createElement('meta');
+            metaTag.setAttribute('name', 'build');
+            document.head.appendChild(metaTag);
         }
+        metaTag.setAttribute('content', build);
+        
+        // Add build info comment after title
+        const titleTag = document.querySelector('title');
+        if (titleTag && titleTag.nextSibling?.nodeType !== Node.COMMENT_NODE) {
+            const buildComment = document.createComment(` BUILD: ${build} `);
+            titleTag.parentNode.insertBefore(buildComment, titleTag.nextSibling);
+        }
+        
+        // Update build info in UI
+        const buildInfoElement = document.getElementById('buildInfo');
+        if (buildInfoElement) {
+            buildInfoElement.textContent = `Build: ${build}`;
+        }
+        
+        // Add cache busting to all CSS and JS files
+        this.addCacheBustingToResources();
+        
+        // Add basic styling for build info
+        this.addBuildInfoStyles();
+        
+        console.log(`Build info added: Build ${build}`);
     }
     
     addCacheBustingToResources() {
-        // Add cache busting query parameter to CSS and JS files
-        if (!window.BuildInfo) return;
+        // Add cache busting query parameter to CSS and JS files using title-based build number
+        if (!this.buildNumber) return;
+        const build = this.buildNumber;
         
         const cssLinks = document.querySelectorAll('link[rel="stylesheet"]');
         const scripts = document.querySelectorAll('script[src]');
@@ -420,15 +425,15 @@ class VibeReaderApp {
         cssLinks.forEach(link => {
             const currentHref = link.getAttribute('href');
             if (currentHref && !currentHref.includes('?v=')) {
-                link.setAttribute('href', `${currentHref}?v=${BuildInfo.build}`);
+                link.setAttribute('href', `${currentHref}?v=${build}`);
             }
         });
         
         // Update JS scripts
         scripts.forEach(script => {
             const currentSrc = script.getAttribute('src');
-            if (currentSrc && !currentSrc.includes('?v=') && !currentSrc.includes('build-info.js')) {
-                script.setAttribute('src', `${currentSrc}?v=${BuildInfo.build}`);
+            if (currentSrc && !currentSrc.includes('?v=')) {
+                script.setAttribute('src', `${currentSrc}?v=${build}`);
             }
         });
     }
