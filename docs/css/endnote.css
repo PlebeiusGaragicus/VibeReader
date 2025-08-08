@@ -1,0 +1,80 @@
+/* Endnote popup styles */
+.endnote-ref {
+  cursor: pointer;
+  color: var(--accent-600, #2563eb);
+  text-decoration: none;
+}
+.endnote-ref sup { text-decoration: underline dotted; }
+
+.endnote-popup {
+  position: absolute;
+  z-index: 2000;
+  background: var(--panel-bg, #ffffff);
+  color: var(--text-primary, #111827);
+  border: 1px solid rgba(0,0,0,0.12);
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+  padding: 10px 12px;
+  max-width: 360px;
+  max-height: 50vh;
+  overflow: auto;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity .12s ease, transform .12s ease;
+}
+.endnote-popup.show { opacity: 1; transform: translateY(0); }
+.endnote-popup .endnote-popup-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+.endnote-popup .endnote-popup-header .title { font-size: 0.95rem; }
+.endnote-popup .endnote-popup-header .close-btn {
+  background: transparent;
+  border: none;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  color: inherit;
+}
+.endnote-popup .endnote-popup-content {
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+.endnote-popup .endnote-popup-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+.endnote-popup .endnote-popup-actions .open-modal-btn {
+  background: var(--accent-600, #2563eb);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+/* Dark theme adjustments */
+body.dark-theme .endnote-popup {
+  background: #111827;
+  color: #e5e7eb;
+  border-color: rgba(255,255,255,0.12);
+  box-shadow: 0 10px 26px rgba(0,0,0,0.6);
+}
+body.dark-theme .endnote-ref { color: #60a5fa; }
+
+/* Optional: honor system dark if no explicit theme class is set */
+@media (prefers-color-scheme: dark) {
+  body:not(.light-theme):not(.dark-theme) .endnote-popup {
+    background: #111827;
+    color: #e5e7eb;
+    border-color: rgba(255,255,255,0.12);
+    box-shadow: 0 10px 26px rgba(0,0,0,0.6);
+  }
+  body:not(.light-theme):not(.dark-theme) .endnote-ref { color: #60a5fa; }
+}
