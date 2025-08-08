@@ -193,7 +193,7 @@ class SidebarManager {
         let popup = null;
         let hideTimeout = null;
 
-        const showPopup = () => {
+        const showPopup = (e) => {
             if (hideTimeout) { clearTimeout(hideTimeout); hideTimeout = null; }
             this.hideAllAIPopups();
 
@@ -208,10 +208,14 @@ class SidebarManager {
                     <span>AI Chat</span>
                 </div>
                 <div class="ai-popup-content">
-                    ${safeQ ? `<div class="ai-q"><strong>Q:</strong> ${safeQ}</div>` : ''}
-                    ${safeSel ? `<div class="ai-sel"><strong>Selected:</strong> ${safeSel}</div>` : ''}
-                    ${safeA ? `<div class="ai-a"><strong>A:</strong> ${safeA}</div>` : '<div class="ai-a"><em>Waiting for answer...</em></div>'}
-                </div>`;
+                    ${safeQ ? `<div class="ai-q">Q: ${safeQ}</div>` : ''}
+                    ${safeSel ? `<div class="ai-selected">"${safeSel}"</div>` : ''}
+                    ${safeA ? `<div class="ai-a">A: ${safeA}</div>` : '<div class="ai-a">Awaiting answer…</div>'}
+                </div>
+                <div class="ai-popup-actions">
+                    <button class="btn-danger ai-delete">Delete</button>
+                </div>
+            `;
 
             document.body.appendChild(popup);
             const rect = aiSpan.getBoundingClientRect();
@@ -224,6 +228,23 @@ class SidebarManager {
             popup.style.left = `${left}px`;
             popup.style.top = `${top}px`;
             setTimeout(() => popup.classList.add('show'), 10);
+
+            // Wire delete button
+            const delBtn = popup.querySelector('.ai-delete');
+            if (delBtn) {
+                delBtn.addEventListener('click', (ev) => {
+                    ev.stopPropagation();
+                    const answerId = ai?.answerId;
+                    if (answerId) {
+                        this.deleteAskAnswer(answerId);
+                    } else {
+                        const groupId = aiSpan.getAttribute('data-highlight-id');
+                        if (groupId) this.removeAIHighlightSpans(groupId);
+                    }
+                    hidePopup();
+                });
+            }
+
             popup.addEventListener('mouseenter', cancelHide);
             popup.addEventListener('mouseleave', scheduleHide);
         };
@@ -238,7 +259,7 @@ class SidebarManager {
             }
         };
 
-        const scheduleHide = () => { hideTimeout = setTimeout(hidePopup, 150); };
+        const scheduleHide = () => { hideTimeout = setTimeout(hidePopup, 600); };
         const cancelHide = () => { if (hideTimeout) { clearTimeout(hideTimeout); hideTimeout = null; } };
 
         aiSpan.addEventListener('mouseenter', showPopup);
@@ -273,7 +294,6 @@ class SidebarManager {
 
             popup = document.createElement('div');
             popup.className = 'highlight-popup';
-            const safeText = this.escapeHTML((highlight && highlight.text) || hlSpan.textContent || '');
             const color = (highlight && highlight.color) || this.getHighlightColorFromClass(hlSpan) || 'yellow';
             popup.innerHTML = `
                 <div class="highlight-popup-header">
@@ -281,7 +301,6 @@ class SidebarManager {
                     <span>Highlight</span>
                 </div>
                 <div class="highlight-popup-content">
-                    <div class="hl-text">${safeText}</div>
                     <div class="hl-colors">
                         <button class="hl-color hl-yellow" data-color="yellow" title="Yellow"></button>
                         <button class="hl-color hl-red" data-color="red" title="Red"></button>
@@ -465,10 +484,8 @@ class SidebarManager {
         // Show TOC button and expand both sidebars when a book is loaded
         this.showTOCButton();
         
-        // Expand both sidebars when a book is loaded (if they're currently collapsed)
-        if (this.isTOCCollapsed) {
-            this.toggleTOC();
-        }
+        // Only expand the right Smart Bar automatically.
+        // Leave the left TOC collapsed by default (user will open it manually).
         if (this.isCollapsed) {
             this.toggleSmartBar();
         }
@@ -581,7 +598,8 @@ class SidebarManager {
                                 this.addAIPopupEvents(el, {
                                     question: item.metadata.question,
                                     answer: item.metadata.answer,
-                                    selectedText: item.metadata.selectedText
+                                    selectedText: item.metadata.selectedText,
+                                    answerId: item.metadata.answerId
                                 });
                             }
                         });
@@ -603,7 +621,8 @@ class SidebarManager {
                                     this.addAIPopupEvents(el, {
                                         question: item.metadata.question,
                                         answer: item.metadata.answer,
-                                        selectedText: item.metadata.selectedText
+                                        selectedText: item.metadata.selectedText,
+                                        answerId: item.metadata.answerId
                                     });
                                 });
                                 return;
@@ -879,6 +898,9 @@ class SidebarManager {
                     <span>Note</span>
                 </div>
                 <div class="note-popup-content">${this.escapeHTML(note.text)}</div>
+                <div class="note-popup-actions">
+                    <button class="btn-danger note-delete">Delete</button>
+                </div>
             `;
 
             // Position popup
@@ -908,6 +930,17 @@ class SidebarManager {
                 popup.addEventListener('mouseenter', cancelHide);
                 popup.addEventListener('mouseleave', scheduleHide);
             }, 10);
+
+            // Wire delete button
+            const delBtn = popup.querySelector('.note-delete');
+            if (delBtn) {
+                delBtn.addEventListener('click', (ev) => {
+                    ev.stopPropagation();
+                    const id = note?.id || noteSpan.getAttribute('data-highlight-id');
+                    if (id) this.deleteNote(id);
+                    hidePopup();
+                });
+            }
         };
 
         const hidePopup = () => {
@@ -997,6 +1030,21 @@ class SidebarManager {
                 parent.normalize();
             });
         }
+    }
+
+    removeAIHighlightSpans(groupId) {
+        // Hide any existing AI popups first
+        this.hideAllAIPopups();
+
+        // Remove engine-based multi-span AI highlights
+        const spans = Array.from(document.querySelectorAll(`.text-ai-highlight[data-highlight-id="${groupId}"]`));
+        spans.forEach(span => {
+            const parent = span.parentNode;
+            if (!parent) return;
+            const tn = document.createTextNode(span.textContent);
+            parent.replaceChild(tn, span);
+            parent.normalize();
+        });
     }
 
     applyNoteHighlight(note) {
@@ -1126,7 +1174,7 @@ class SidebarManager {
     renderActivityItem(item) {
         const timeStr = this.formatTime(item.timestamp);
         const icons = {
-            highlight: '🎨',
+            highlight: '🖍',
             note: '📝',
             'ai-chat': '🤖',
             thinking: '🤔'
@@ -1239,7 +1287,8 @@ class SidebarManager {
                     parts.forEach(el => this.addAIPopupEvents(el, {
                         question: item.metadata.question,
                         answer,
-                        selectedText: item.metadata.selectedText
+                        selectedText: item.metadata.selectedText,
+                        answerId: savedAnswer?.id || item.metadata.answerId
                     }));
                 }, 0);
             }
@@ -1405,10 +1454,16 @@ class SidebarManager {
         if (!currentBook) return;
 
         const askAnswers = this.app.storage.getAskAnswers(currentBook.id);
+        const answer = askAnswers.find(a => a.id === answerId);
         const updatedAnswers = askAnswers.filter(a => a.id !== answerId);
         
         this.app.storage.saveAskAnswers(currentBook.id, updatedAnswers);
         this.displayAskAnswers(updatedAnswers);
+
+        // Remove any associated visual AI highlight
+        if (answer && answer.highlightId) {
+            this.removeAIHighlightSpans(answer.highlightId);
+        }
     }
 
     saveNote() {

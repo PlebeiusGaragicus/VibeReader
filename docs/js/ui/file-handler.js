@@ -101,6 +101,46 @@ class FileHandler {
         }
     }
 
+    applyAIAnswers(askAnswers) {
+        if (!askAnswers || !askAnswers.length) return;
+        const readingContainer = document.getElementById('readingContainer');
+        if (!readingContainer || !window.HighlightEngine) return;
+
+        askAnswers.forEach(answer => {
+            try {
+                // Require both serialized range and a group highlightId
+                if (!answer || !answer.serializedRange || !answer.highlightId) return;
+
+                // Skip if already applied
+                const existing = document.querySelector(`.text-ai-highlight[data-highlight-id="${answer.highlightId}"]`);
+                if (existing) return;
+
+                const range = window.HighlightEngine.restoreRange(answer.serializedRange, readingContainer);
+                if (!range) return;
+
+                const ok = window.HighlightEngine.applyRangeHighlight(
+                    range,
+                    answer.highlightId,
+                    'text-ai-highlight',
+                    answer.timestamp
+                );
+                if (ok && this.app && this.app.sidebar && this.app.sidebar.addAIPopupEvents) {
+                    setTimeout(() => {
+                        const parts = document.querySelectorAll(`.text-ai-highlight[data-highlight-id="${answer.highlightId}"]`);
+                        parts.forEach(el => this.app.sidebar.addAIPopupEvents(el, {
+                            question: answer.question,
+                            answer: answer.answer,
+                            selectedText: answer.selectedText,
+                            answerId: answer.id
+                        }));
+                    }, 0);
+                }
+            } catch (e) {
+                console.warn('Failed to apply AI answer highlight:', e);
+            }
+        });
+    }
+
     async loadBook(bookId, bookData) {
         this.currentBook = {
             id: bookId,
@@ -254,6 +294,9 @@ class FileHandler {
         
         // Apply notes to content
         this.applyNotes(notes);
+
+        // Apply AI chat selections to content
+        this.applyAIAnswers(askAnswers);
     }
 
     applyHighlights(highlights) {

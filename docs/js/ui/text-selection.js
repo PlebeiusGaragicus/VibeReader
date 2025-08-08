@@ -178,6 +178,7 @@ class TextSelectionHandler {
 
         try {
             // First, try the robust engine-based approach (cross-paragraph safe)
+            let appliedOk = false;
             if (window.HighlightEngine) {
                 const root = document.getElementById('readingContainer');
                 const rangeToApply = (highlight && highlight.serializedRange)
@@ -191,39 +192,47 @@ class TextSelectionHandler {
                         highlight.timestamp
                     );
                     if (ok) {
-                        return; // Applied successfully
+                        appliedOk = true; // Applied successfully
                     }
                 }
             }
 
-            // Check if the range can be safely wrapped with surroundContents
-            const canUseSurround = this.canUseSurroundContents(this.selectedRange);
-            console.log('Can use surroundContents:', canUseSurround);
-            
-            if (canUseSurround) {
-                console.log('Using surroundContents method');
-                // Create highlight span
-                const highlightSpan = document.createElement('span');
-                highlightSpan.className = 'text-highlight';
-                highlightSpan.setAttribute('data-highlight-id', highlight.id);
-                highlightSpan.setAttribute('title', `Highlighted on ${new Date(highlight.timestamp).toLocaleDateString()}`);
+            if (!appliedOk) {
+                // Check if the range can be safely wrapped with surroundContents
+                const canUseSurround = this.canUseSurroundContents(this.selectedRange);
+                console.log('Can use surroundContents:', canUseSurround);
+                
+                if (canUseSurround) {
+                    console.log('Using surroundContents method');
+                    // Create highlight span
+                    const highlightSpan = document.createElement('span');
+                    highlightSpan.className = 'text-highlight';
+                    highlightSpan.setAttribute('data-highlight-id', highlight.id);
+                    highlightSpan.setAttribute('title', `Highlighted on ${new Date(highlight.timestamp).toLocaleDateString()}`);
 
-                // Wrap the selected content
-                this.selectedRange.surroundContents(highlightSpan);
-                console.log('Successfully applied highlight with surroundContents');
-                console.log('Highlight span content:', highlightSpan.textContent);
-                console.log('Highlight span HTML:', highlightSpan.outerHTML);
-            } else {
-                console.log('Using marker-based highlighting for complex selection');
-                // Use marker-based approach for complex selections
-                this.applyMarkerBasedHighlight(highlight);
+                    // Wrap the selected content
+                    this.selectedRange.surroundContents(highlightSpan);
+                    console.log('Successfully applied highlight with surroundContents');
+                    console.log('Highlight span content:', highlightSpan.textContent);
+                    console.log('Highlight span HTML:', highlightSpan.outerHTML);
+                } else {
+                    console.log('Using marker-based highlighting for complex selection');
+                    // Use marker-based approach for complex selections
+                    this.applyMarkerBasedHighlight(highlight);
+                }
             }
-            
+        
         } catch (error) {
             // Fallback: try marker-based highlighting
             console.warn('Failed to apply highlight with surroundContents, trying marker-based approach:', error);
             this.applyMarkerBasedHighlight(highlight);
         }
+
+        // Attach hover popup events to the newly created highlight spans immediately
+        setTimeout(() => {
+            const parts = document.querySelectorAll(`.text-highlight[data-highlight-id="${highlight.id}"]`);
+            parts.forEach(el => this.app.sidebar.addHighlightPopupEvents(el, highlight));
+        }, 0);
     }
 
     canUseSurroundContents(range) {
@@ -613,20 +622,34 @@ class TextSelectionHandler {
                     serializedRange = window.HighlightEngine.serializeRange(rangeToUse, readingContainer);
                     aiHighlightId = 'ai_sel_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
                     // Apply a visual highlight for AI selection
-                    window.HighlightEngine.applyRangeHighlight(
+                    let applied = window.HighlightEngine.applyRangeHighlight(
                         rangeToUse,
                         aiHighlightId,
                         'text-ai-highlight',
                         Date.now()
                     );
+                    // If initial apply failed (e.g., stale range), try restoring from serialized range
+                    if (!applied && serializedRange) {
+                        const restored = window.HighlightEngine.restoreRange(serializedRange, readingContainer);
+                        if (restored) {
+                            applied = window.HighlightEngine.applyRangeHighlight(
+                                restored,
+                                aiHighlightId,
+                                'text-ai-highlight',
+                                Date.now()
+                            );
+                        }
+                    }
                     // Attach AI popup hover immediately (will show waiting state until answer comes)
                     setTimeout(() => {
                         const parts = document.querySelectorAll(`.text-ai-highlight[data-highlight-id="${aiHighlightId}"]`);
-                        parts.forEach(el => this.app.sidebar.addAIPopupEvents(el, {
-                            question,
-                            selectedText: selectedTextToUse,
-                            answer: null
-                        }));
+                        if (parts && parts.length) {
+                            parts.forEach(el => this.app.sidebar.addAIPopupEvents(el, {
+                                question,
+                                selectedText: selectedTextToUse,
+                                answer: null
+                            }));
+                        }
                     }, 0);
                 } catch (e) {
                     console.warn('Failed to serialize/apply AI selection highlight:', e);
