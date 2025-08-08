@@ -189,6 +189,240 @@ class SidebarManager {
         }
     }
 
+    addAIPopupEvents(aiSpan, ai) {
+        let popup = null;
+        let hideTimeout = null;
+
+        const showPopup = () => {
+            if (hideTimeout) { clearTimeout(hideTimeout); hideTimeout = null; }
+            this.hideAllAIPopups();
+
+            popup = document.createElement('div');
+            popup.className = 'ai-popup';
+            const safeQ = this.escapeHTML(ai?.question || '');
+            const safeSel = this.escapeHTML(ai?.selectedText || '');
+            const safeA = this.escapeHTML(ai?.answer || '');
+            popup.innerHTML = `
+                <div class="ai-popup-header">
+                    <span>🤖</span>
+                    <span>AI Chat</span>
+                </div>
+                <div class="ai-popup-content">
+                    ${safeQ ? `<div class="ai-q"><strong>Q:</strong> ${safeQ}</div>` : ''}
+                    ${safeSel ? `<div class="ai-sel"><strong>Selected:</strong> ${safeSel}</div>` : ''}
+                    ${safeA ? `<div class="ai-a"><strong>A:</strong> ${safeA}</div>` : '<div class="ai-a"><em>Waiting for answer...</em></div>'}
+                </div>`;
+
+            document.body.appendChild(popup);
+            const rect = aiSpan.getBoundingClientRect();
+            const popupRect = popup.getBoundingClientRect();
+            let left = rect.left + (rect.width / 2) - (popupRect.width / 2);
+            let top = rect.bottom + 8;
+            if (left < 10) left = 10;
+            if (left + popupRect.width > window.innerWidth - 10) left = window.innerWidth - popupRect.width - 10;
+            if (top + popupRect.height > window.innerHeight - 10) top = rect.top - popupRect.height - 8;
+            popup.style.left = `${left}px`;
+            popup.style.top = `${top}px`;
+            setTimeout(() => popup.classList.add('show'), 10);
+            popup.addEventListener('mouseenter', cancelHide);
+            popup.addEventListener('mouseleave', scheduleHide);
+        };
+
+        const hidePopup = () => {
+            if (popup) {
+                popup.classList.remove('show');
+                setTimeout(() => {
+                    if (popup && popup.parentNode) popup.parentNode.removeChild(popup);
+                    popup = null;
+                }, 120);
+            }
+        };
+
+        const scheduleHide = () => { hideTimeout = setTimeout(hidePopup, 150); };
+        const cancelHide = () => { if (hideTimeout) { clearTimeout(hideTimeout); hideTimeout = null; } };
+
+        aiSpan.addEventListener('mouseenter', showPopup);
+        aiSpan.addEventListener('mouseleave', scheduleHide);
+        aiSpan.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (popup && popup.classList.contains('show')) {
+                hidePopup();
+            } else {
+                showPopup(e);
+            }
+            // Also sync right panel: scroll and flash associated activity
+            const groupId = aiSpan.getAttribute('data-highlight-id');
+            if (groupId) {
+                this.scrollAndFlashActivityByAnnotation(groupId, 'ai-chat');
+            }
+        });
+    }
+
+    hideAllAIPopups() {
+        document.querySelectorAll('.ai-popup').forEach(p => p.parentNode && p.parentNode.removeChild(p));
+    }
+
+    // Highlight hover popup with delete + color options
+    addHighlightPopupEvents(hlSpan, highlight) {
+        let popup = null;
+        let hideTimeout = null;
+
+        const showPopup = () => {
+            if (hideTimeout) { clearTimeout(hideTimeout); hideTimeout = null; }
+            this.hideAllHighlightPopups();
+
+            popup = document.createElement('div');
+            popup.className = 'highlight-popup';
+            const safeText = this.escapeHTML((highlight && highlight.text) || hlSpan.textContent || '');
+            const color = (highlight && highlight.color) || this.getHighlightColorFromClass(hlSpan) || 'yellow';
+            popup.innerHTML = `
+                <div class="highlight-popup-header">
+                    <span>🎨</span>
+                    <span>Highlight</span>
+                </div>
+                <div class="highlight-popup-content">
+                    <div class="hl-text">${safeText}</div>
+                    <div class="hl-colors">
+                        <button class="hl-color hl-yellow" data-color="yellow" title="Yellow"></button>
+                        <button class="hl-color hl-red" data-color="red" title="Red"></button>
+                        <button class="hl-color hl-orange" data-color="orange" title="Orange"></button>
+                        <button class="hl-color hl-purple" data-color="purple" title="Purple"></button>
+                        <button class="hl-color hl-brown" data-color="brown" title="Brown"></button>
+                    </div>
+                    <div class="hl-actions">
+                        <button class="btn-danger hl-delete">Delete</button>
+                    </div>
+                </div>`;
+
+            document.body.appendChild(popup);
+            const rect = hlSpan.getBoundingClientRect();
+            const popupRect = popup.getBoundingClientRect();
+            let left = rect.left + (rect.width / 2) - (popupRect.width / 2);
+            let top = rect.bottom + 8;
+            if (left < 10) left = 10;
+            if (left + popupRect.width > window.innerWidth - 10) left = window.innerWidth - popupRect.width - 10;
+            if (top + popupRect.height > window.innerHeight - 10) top = rect.top - popupRect.height - 8;
+            popup.style.left = `${left}px`;
+            popup.style.top = `${top}px`;
+            setTimeout(() => popup.classList.add('show'), 10);
+
+            // Wire color buttons and delete
+            popup.querySelectorAll('.hl-color').forEach(btn => {
+                if (btn.getAttribute('data-color') === color) btn.classList.add('selected');
+                btn.addEventListener('click', (ev) => {
+                    ev.stopPropagation();
+                    const newColor = btn.getAttribute('data-color');
+                    const id = hlSpan.getAttribute('data-highlight-id');
+                    if (id && newColor) {
+                        this.changeHighlightColor(id, newColor);
+                        popup.querySelectorAll('.hl-color').forEach(b => b.classList.remove('selected'));
+                        btn.classList.add('selected');
+                    }
+                });
+            });
+            const delBtn = popup.querySelector('.hl-delete');
+            if (delBtn) {
+                delBtn.addEventListener('click', (ev) => {
+                    ev.stopPropagation();
+                    const id = hlSpan.getAttribute('data-highlight-id');
+                    if (id) this.deleteHighlight(id);
+                    hidePopup();
+                });
+            }
+
+            popup.addEventListener('mouseenter', cancelHide);
+            popup.addEventListener('mouseleave', scheduleHide);
+        };
+
+        const hidePopup = () => {
+            if (popup) {
+                popup.classList.remove('show');
+                setTimeout(() => {
+                    if (popup && popup.parentNode) popup.parentNode.removeChild(popup);
+                    popup = null;
+                }, 120);
+            }
+        };
+
+        const scheduleHide = () => { hideTimeout = setTimeout(hidePopup, 600); };
+        const cancelHide = () => { if (hideTimeout) { clearTimeout(hideTimeout); hideTimeout = null; } };
+
+        hlSpan.addEventListener('mouseenter', showPopup);
+        hlSpan.addEventListener('mouseleave', scheduleHide);
+        hlSpan.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (popup && popup.classList.contains('show')) hidePopup(); else showPopup(e);
+            const id = hlSpan.getAttribute('data-highlight-id');
+            if (id) this.scrollAndFlashActivityByAnnotation(id, 'highlight');
+        });
+
+        hlSpan._highlightPopupEvents = { showPopup, hidePopup, scheduleHide, cancelHide };
+    }
+
+    hideAllHighlightPopups() {
+        document.querySelectorAll('.highlight-popup').forEach(p => p.parentNode && p.parentNode.removeChild(p));
+    }
+
+    getHighlightColorFromClass(el) {
+        const classes = Array.from(el.classList);
+        const match = classes.find(c => c.startsWith('text-highlight-'));
+        if (match) return match.replace('text-highlight-', '');
+        if (classes.includes('text-highlight')) return 'yellow';
+        return null;
+    }
+
+    changeHighlightColor(highlightId, color) {
+        // Update DOM spans
+        const spans = document.querySelectorAll(`[data-highlight-id="${highlightId}"]`);
+        const newClass = (color && color !== 'yellow') ? `text-highlight-${color}` : 'text-highlight';
+        spans.forEach(span => {
+            const toRemove = Array.from(span.classList).filter(c => c === 'text-highlight' || c.startsWith('text-highlight-'));
+            toRemove.forEach(c => span.classList.remove(c));
+            span.classList.add(newClass);
+        });
+
+        // Update storage and activity feed
+        const currentBook = this.app.fileHandler.getCurrentBook();
+        if (!currentBook) return;
+        const highlights = this.app.storage.getHighlights(currentBook.id) || [];
+        const updated = highlights.map(h => h.id === highlightId ? { ...h, color } : h);
+        this.app.storage.saveHighlights(currentBook.id, updated);
+        this.displayHighlights(updated);
+    }
+
+    // Scroll and flash right panel for an annotation clicked in content
+    scrollAndFlashActivityByAnnotation(groupId, type) {
+        let item = null;
+        if (type === 'note') {
+            item = this.activityItems.find(i => i.type === 'note' && i.metadata && i.metadata.noteId === groupId);
+        } else if (type === 'ai-chat') {
+            item = this.activityItems.find(i => i.type === 'ai-chat' && i.metadata && (i.metadata.highlightId === groupId || i.metadata.answerId === groupId));
+        } else {
+            item = this.activityItems.find(i => i.type === 'highlight' && i.metadata && i.metadata.highlightId === groupId);
+        }
+        if (!item) return;
+        this.scrollActivityFeedToItem(item.id);
+        this.flashActivityItem(item.id);
+    }
+
+    scrollActivityFeedToItem(activityId) {
+        const feed = document.getElementById('activityFeed');
+        const container = document.getElementById('smartBarContent') || feed?.parentElement;
+        if (!feed || !container) return;
+        const itemEl = feed.querySelector(`.activity-item[data-id="${activityId}"]`);
+        if (!itemEl) return;
+        const top = itemEl.offsetTop - 12;
+        container.scrollTo({ top, behavior: 'smooth' });
+    }
+
+    flashActivityItem(activityId) {
+        const feed = document.getElementById('activityFeed');
+        if (!feed) return;
+        const itemEl = feed.querySelector(`.activity-item[data-id="${activityId}"]`);
+        if (!itemEl) return;
+        itemEl.classList.add('flash-activity');
+        setTimeout(() => itemEl.classList.remove('flash-activity'), 1000);
+    }
     loadTOCState() {
         // TOC should always start collapsed and hidden initially
         // Only show when a book is loaded via expandSidebarsForBook()
@@ -330,6 +564,62 @@ class SidebarManager {
         const readingContainer = document.getElementById('readingContainer');
         if (!readingContainer) return;
 
+        // 1) Prefer robust range-based scrolling if we have a serialized range
+        if (window.HighlightEngine && item.metadata && item.metadata.serializedRange) {
+            const range = window.HighlightEngine.restoreRange(item.metadata.serializedRange, readingContainer);
+            if (range) {
+                window.HighlightEngine.scrollToRange(range, 'smooth', readingContainer);
+
+                // Flash all parts of this annotation if present
+                const groupId = item.metadata.highlightId || item.metadata.noteId;
+                if (groupId) {
+                    let groupParts = document.querySelectorAll(`[data-highlight-id="${groupId}"]`);
+                    if (groupParts && groupParts.length) {
+                        groupParts.forEach(el => {
+                            this.addTemporaryHighlight(el);
+                            if (item.type === 'ai-chat' && el.classList.contains('text-ai-highlight')) {
+                                this.addAIPopupEvents(el, {
+                                    question: item.metadata.question,
+                                    answer: item.metadata.answer,
+                                    selectedText: item.metadata.selectedText
+                                });
+                            }
+                        });
+                        return;
+                    }
+                    // If this is an AI chat and we have no existing parts, apply a visual AI highlight now
+                    if (item.type === 'ai-chat') {
+                        try {
+                            const applied = window.HighlightEngine.applyRangeHighlight(
+                                range,
+                                groupId,
+                                'text-ai-highlight',
+                                Date.now()
+                            );
+                            if (applied) {
+                                groupParts = document.querySelectorAll(`[data-highlight-id="${groupId}"]`);
+                                groupParts.forEach(el => {
+                                    this.addTemporaryHighlight(el);
+                                    this.addAIPopupEvents(el, {
+                                        question: item.metadata.question,
+                                        answer: item.metadata.answer,
+                                        selectedText: item.metadata.selectedText
+                                    });
+                                });
+                                return;
+                            }
+                        } catch (e) {
+                            console.warn('Failed to apply AI chat highlight on scroll:', e);
+                        }
+                    }
+                    // Legacy note span fallback for flashing
+                    const legacy = document.querySelectorAll(`[data-note-id="${groupId}"]`);
+                    legacy.forEach(el => this.addTemporaryHighlight(el));
+                }
+                return;
+            }
+        }
+
         let targetElement = null;
 
         // Find the target element based on item type
@@ -338,7 +628,9 @@ class SidebarManager {
             targetElement = document.querySelector(`[data-highlight-id="${item.metadata.highlightId}"]`);
         } else if (item.type === 'note' && item.metadata.noteId) {
             // For notes, first try to find the note highlight element
-            targetElement = document.querySelector(`[data-note-id="${item.metadata.noteId}"]`);
+            // Prefer engine-based spans
+            targetElement = document.querySelector(`.text-note-highlight[data-highlight-id="${item.metadata.noteId}"]`) ||
+                            document.querySelector(`[data-note-id="${item.metadata.noteId}"]`);
             // If not found, fall back to text search
             if (!targetElement && item.metadata.selectedText) {
                 targetElement = this.findTextInContent(item.metadata.selectedText, readingContainer);
@@ -353,15 +645,37 @@ class SidebarManager {
 
         // Scroll to the target element
         if (targetElement) {
-            // Smooth scroll to the element
-            targetElement.scrollIntoView({
-                behavior: 'smooth',
-                block: 'center',
-                inline: 'nearest'
-            });
+            // Smooth scroll within the reading container if it is scrollable; otherwise fallback
+            const style = window.getComputedStyle(readingContainer);
+            const overflowY = style.overflowY;
+            const canScroll = (overflowY !== 'visible' && overflowY !== 'hidden') && ((readingContainer.scrollHeight - readingContainer.clientHeight) > 1);
+            if (canScroll) {
+                const elRect = targetElement.getBoundingClientRect();
+                const containerRect = readingContainer.getBoundingClientRect();
+                const targetTop = readingContainer.scrollTop + (elRect.top - containerRect.top) - 100;
+                readingContainer.scrollTo({ top: Math.max(0, targetTop), behavior: 'smooth' });
+            } else {
+                targetElement.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+            }
 
-            // Add a temporary highlight effect
-            this.addTemporaryHighlight(targetElement);
+            // Add a temporary highlight effect across all parts when applicable
+            const groupId = item.metadata.highlightId || item.metadata.noteId;
+            if (groupId) {
+                const groupParts = document.querySelectorAll(`[data-highlight-id="${groupId}"]`);
+                if (groupParts && groupParts.length) {
+                    groupParts.forEach(el => this.addTemporaryHighlight(el));
+                } else {
+                    // Legacy note span
+                    const legacy = document.querySelectorAll(`[data-note-id="${groupId}"]`);
+                    if (legacy && legacy.length) {
+                        legacy.forEach(el => this.addTemporaryHighlight(el));
+                    } else {
+                        this.addTemporaryHighlight(targetElement);
+                    }
+                }
+            } else {
+                this.addTemporaryHighlight(targetElement);
+            }
         } else {
             // If we can't find the exact element, show a message
             if (this.app.modalManager) {
@@ -495,16 +809,37 @@ class SidebarManager {
         // Add a temporary visual highlight to show what was clicked
         const originalBackground = element.style.backgroundColor;
         const originalTransition = element.style.transition;
-        
-        element.style.transition = 'background-color 0.3s ease';
-        element.style.backgroundColor = 'rgba(59, 130, 246, 0.3)'; // Blue highlight
-        
+        const originalOutline = element.style.outline;
+        const originalOutlineOffset = element.style.outlineOffset;
+
+        // Pick a flash color based on highlight type
+        let flashColor = 'rgba(251, 191, 36, 0.65)'; // default to bright yellow
+        if (element.classList.contains('text-note-highlight')) {
+            // teal/green accent used in note styling
+            flashColor = 'rgba(16, 185, 129, 0.35)';
+        } else if (element.classList.contains('text-ai-highlight')) {
+            // AI selections use blue accent
+            flashColor = 'rgba(37, 99, 235, 0.78)'; // BRIGHT blue flash
+            // bump outline to make it really pop during flash
+            element.style.outline = '3px solid #60a5fa';
+            element.style.outlineOffset = '1px';
+        } else if (element.classList.contains('text-highlight')) {
+            // highlights specifically: bright yellow
+            flashColor = 'rgba(251, 191, 36, 0.65)';
+        }
+
+        element.style.transition = 'background-color 0.35s ease';
+        element.style.backgroundColor = flashColor;
+
+        // After a short delay, fade back to the element's normal background
         setTimeout(() => {
-            element.style.backgroundColor = originalBackground;
+            element.style.backgroundColor = originalBackground; // empty string restores CSS rule color
             setTimeout(() => {
                 element.style.transition = originalTransition;
-            }, 300);
-        }, 1500);
+                element.style.outline = originalOutline;
+                element.style.outlineOffset = originalOutlineOffset;
+            }, 350);
+        }, 900);
     }
 
     scrollToBottom() {
@@ -608,6 +943,9 @@ class SidebarManager {
             } else {
                 showPopup(e);
             }
+            // Sync right panel: scroll and flash associated note item
+            const id = noteSpan.getAttribute('data-highlight-id') || note?.id;
+            if (id) this.scrollAndFlashActivityByAnnotation(id, 'note');
         });
 
         // Add popup hover events after popup is created
@@ -635,49 +973,71 @@ class SidebarManager {
     }
 
     removeNoteHighlight(noteId) {
-        const noteElement = document.querySelector(`[data-note-id="${noteId}"]`);
-        if (noteElement) {
-            // Hide any popup for this note first
-            this.hideAllNotePopups();
-            
-            // Replace note span with its text content
-            const parent = noteElement.parentNode;
-            const textNode = document.createTextNode(noteElement.textContent);
-            parent.replaceChild(textNode, noteElement);
-            
-            // Normalize the parent to merge adjacent text nodes
+        // Hide any popup for this note first
+        this.hideAllNotePopups();
+
+        // Remove legacy single-span note highlight
+        const legacy = document.querySelector(`[data-note-id="${noteId}"]`);
+        if (legacy) {
+            const parent = legacy.parentNode;
+            const textNode = document.createTextNode(legacy.textContent);
+            parent.replaceChild(textNode, legacy);
             parent.normalize();
+        }
+
+        // Remove engine-based multi-span note highlights
+        const engineSpans = Array.from(document.querySelectorAll(`.text-note-highlight[data-highlight-id="${noteId}"]`));
+        if (engineSpans.length) {
+            // Replace each span with its text node
+            engineSpans.forEach(span => {
+                const parent = span.parentNode;
+                if (!parent) return;
+                const tn = document.createTextNode(span.textContent);
+                parent.replaceChild(tn, span);
+                parent.normalize();
+            });
         }
     }
 
     applyNoteHighlight(note) {
-        // Apply visual highlighting to text with notes (similar to highlights but different style)
+        // Apply visual highlighting to text with notes using HighlightEngine when possible
         try {
-            const range = this.preservedSelectedRange;
-            if (!range) {
-                console.warn('No preserved range available, using fallback method');
-                this.applyNoteHighlightFallback(note);
+            const readingContainer = document.getElementById('readingContainer');
+            let applied = false;
+
+            if (window.HighlightEngine) {
+                // Prefer a live preserved range; otherwise restore from serialized
+                let range = this.preservedSelectedRange || (note && note.serializedRange
+                    ? window.HighlightEngine.restoreRange(note.serializedRange, readingContainer)
+                    : null);
+
+                if (range) {
+                    applied = window.HighlightEngine.applyRangeHighlight(
+                        range,
+                        note.id,
+                        'text-note-highlight',
+                        note.timestamp
+                    );
+                }
+            }
+
+            if (applied) {
+                // Attach popup events to all parts of this note highlight
+                setTimeout(() => {
+                    const parts = document.querySelectorAll(`.text-note-highlight[data-highlight-id="${note.id}"]`);
+                    parts.forEach(el => this.addNotePopupEvents(el, note));
+                }, 0);
+
+                // Clear preserved selection
+                this.preservedSelectedRange = null;
+                this.preservedSelectedText = null;
                 return;
             }
 
-            // Create note highlight span
-            const noteSpan = document.createElement('span');
-            noteSpan.className = 'text-note-highlight';
-            noteSpan.setAttribute('data-note-id', note.id);
-            noteSpan.setAttribute('title', `Note: ${note.text.substring(0, 100)}${note.text.length > 100 ? '...' : ''}`);
-
-            // Wrap the selected text
-            range.surroundContents(noteSpan);
-            
-            // Add note popup functionality
-            this.addNotePopupEvents(noteSpan, note);
-            
-            // Clear the preserved range after use
-            this.preservedSelectedRange = null;
-            this.preservedSelectedText = null;
-        } catch (error) {
             // Fallback: try to highlight by replacing text
-            console.warn('Failed to apply note highlight with surroundContents, trying fallback:', error);
+            this.applyNoteHighlightFallback(note);
+        } catch (error) {
+            console.warn('Failed to apply note highlight:', error);
             this.applyNoteHighlightFallback(note);
         }
     }
@@ -838,18 +1198,21 @@ class SidebarManager {
     }
 
     // Method to immediately show AI chat with thinking placeholder
-    addThinkingAIChat(question, selectedText) {
+    addThinkingAIChat(question, selectedText, opts = {}) {
+        const { serializedRange = null, highlightId = null } = opts || {};
         const thinkingItem = this.addActivityItem('thinking', 'Thinking about your question...', {
             question,
             selectedText,
-            isThinking: true
+            isThinking: true,
+            serializedRange,
+            highlightId
         });
         
         return thinkingItem.id;
     }
 
     // Method to update thinking item with actual AI response
-    updateAIChat(thinkingId, answer) {
+    updateAIChat(thinkingId, answer, savedAnswer) {
         const item = this.activityItems.find(i => i.id === thinkingId);
         if (item && item.metadata.isThinking) {
             const content = `Q: ${item.metadata.question}\n\nSelected: "${item.metadata.selectedText}"\n\nA: ${answer}`;
@@ -860,9 +1223,26 @@ class SidebarManager {
                 metadata: {
                     ...item.metadata,
                     answer: answer,
-                    isThinking: false
+                    isThinking: false,
+                    // If we have a saved answer record, carry its IDs to enable de-duplication
+                    answerId: savedAnswer?.id || item.metadata.answerId,
+                    serializedRange: savedAnswer?.serializedRange || item.metadata.serializedRange,
+                    highlightId: savedAnswer?.highlightId || item.metadata.highlightId
                 }
             });
+
+            // Attach AI popup events to any existing AI highlight spans for this item
+            const groupId = item.metadata.highlightId;
+            if (groupId) {
+                setTimeout(() => {
+                    const parts = document.querySelectorAll(`.text-ai-highlight[data-highlight-id="${groupId}"]`);
+                    parts.forEach(el => this.addAIPopupEvents(el, {
+                        question: item.metadata.question,
+                        answer,
+                        selectedText: item.metadata.selectedText
+                    }));
+                }, 0);
+            }
         }
     }
 
@@ -949,7 +1329,8 @@ class SidebarManager {
                     highlightId: highlight.id,
                     originalText: highlight.text,
                     chapter: highlight.chapter,
-                    timestamp: highlight.timestamp
+                    timestamp: highlight.timestamp,
+                    serializedRange: highlight.serializedRange
                 });
             });
         }
@@ -971,7 +1352,8 @@ class SidebarManager {
                     originalText: note.text,
                     selectedText: note.selectedText,
                     chapter: note.chapter,
-                    timestamp: note.timestamp
+                    timestamp: note.timestamp,
+                    serializedRange: note.serializedRange
                 });
             });
         }
@@ -982,14 +1364,22 @@ class SidebarManager {
         if (askAnswers && askAnswers.length > 0) {
             askAnswers.forEach(answer => {
                 const content = `Q: ${answer.question}\n\nSelected: "${answer.selectedText}"\n\nA: ${answer.answer}`;
-                
-                this.addActivityItem('ai-chat', content, {
+                // Deduplicate: update existing ai-chat with same answerId, else add new
+                const existing = this.activityItems.find(i => i.type === 'ai-chat' && i.metadata && i.metadata.answerId === answer.id);
+                const newMeta = {
                     answerId: answer.id,
                     question: answer.question,
                     answer: answer.answer,
                     selectedText: answer.selectedText,
-                    timestamp: answer.timestamp
-                });
+                    timestamp: answer.timestamp,
+                    serializedRange: answer.serializedRange,
+                    highlightId: answer.highlightId
+                };
+                if (existing) {
+                    this.updateActivityItem(existing.id, { type: 'ai-chat', content, metadata: { ...existing.metadata, ...newMeta } });
+                } else {
+                    this.addActivityItem('ai-chat', content, newMeta);
+                }
             });
         }
     }
@@ -1038,16 +1428,24 @@ class SidebarManager {
         }
 
         try {
+            // Serialize the selection range for robust restoration
+            let serializedRange = null;
+            const readingContainer = document.getElementById('readingContainer');
+            if (window.HighlightEngine && this.preservedSelectedRange && readingContainer) {
+                serializedRange = window.HighlightEngine.serializeRange(this.preservedSelectedRange, readingContainer);
+            }
+
             const note = {
                 id: this.generateNoteId(),
                 text: noteText,
                 selectedText: selectedTextPreview.textContent || '',
                 timestamp: new Date().toISOString(),
-                chapter: this.getCurrentChapter()
+                chapter: this.getCurrentChapter(),
+                serializedRange
             };
 
-            // Apply visual highlighting to the selected text (like highlights do)
-            if (note.selectedText && this.preservedSelectedRange) {
+            // Apply visual highlighting to the selected text (engine preferred)
+            if (note.selectedText) {
                 this.applyNoteHighlight(note);
             }
 
